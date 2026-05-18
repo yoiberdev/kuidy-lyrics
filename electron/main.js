@@ -9,12 +9,16 @@ const isDev = process.env.NODE_ENV === 'development';
 const ENV_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 
 let mainWindow = null;
+let popoverWindow = null;
 let tray = null;
 let pollTimer = null;
 let lastTrackId = null;
 let currentLyrics = null;
 let isFetchingLyrics = false;
+let lastPlaybackPayload = { playing: false };
+let lastPopoverBlurAt = 0;
 
+// ---------- Main lyrics overlay window ----------
 function createWindow() {
   const { workArea } = screen.getPrimaryDisplay();
   const cfg = loadConfig();
@@ -34,9 +38,11 @@ function createWindow() {
     backgroundColor: '#00000000',
     resizable: true,
     hasShadow: false,
-    skipTaskbar: false,
+    skipTaskbar: true,
     alwaysOnTop: true,
     fullscreenable: false,
+    minimizable: false,
+    maximizable: false,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -46,12 +52,11 @@ function createWindow() {
     },
   });
 
-  // Above almost everything, including borderless-fullscreen games.
   mainWindow.setAlwaysOnTop(true, 'screen-saver');
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   if (isDev) {
-    mainWindow.loadURL('http://127.0.0.1:5173');
+    mainWindow.loadURL('http://127.0.0.1:5173/');
   } else {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
@@ -60,12 +65,11 @@ function createWindow() {
     mainWindow.show();
     const c = loadConfig();
     if (c.minimalMode) {
-      mainWindow.setIgnoreMouseEvents(true, { forward: true });
+      mainWindow.setIgnoreMouseEvents(true, { forward: false });
     }
     if (c.opacity != null) mainWindow.setOpacity(c.opacity);
   });
 
-  // Persist window position on move/resize
   const saveBounds = () => {
     if (!mainWindow) return;
     const b = mainWindow.getBounds();
@@ -75,22 +79,141 @@ function createWindow() {
   mainWindow.on('move', saveBounds);
   mainWindow.on('resize', saveBounds);
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-    stopPolling();
+  // Closing the window from its own close button just hides it (app stays in tray)
+  mainWindow.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
+  mainWindow.on('show', () => {
+    rebuildTrayMenu();
+    sendPopoverState();
+  });
+
+  mainWindow.on('hide', () => {
+    rebuildTrayMenu();
+    sendPopoverState();
+  });
+}
+
+// ---------- Popover (tray menu) window ----------
+function createPopoverWindow() {
+  popoverWindow = new BrowserWindow({
+    width: 320,
+    height: 380,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: true,
+    show: false,
+    focusable: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  popoverWindow.setAlwaysOnTop(true, 'pop-up-menu');
+
+  if (isDev) {
+    popoverWindow.loadURL('http://127.0.0.1:5173/#popover');
+  } else {
+    popoverWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { hash: 'popover' });
+  }
+
+  popoverWindow.on('blur', () => {
+    lastPopoverBlurAt = Date.now();
+    if (popoverWindow && popoverWindow.isVisible()) popoverWindow.hide();
+  });
+
+  popoverWindow.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      popoverWindow.hide();
+    }
+  });
+}
+
+function positionPopover() {
+  if (!tray || !popoverWindow) return;
+  const trayBounds = tray.getBounds();
+  const winBounds = popoverWindow.getBounds();
+  const display = screen.getDisplayNearestPoint({
+    x: trayBounds.x + Math.floor(trayBounds.width / 2),
+    y: trayBounds.y + Math.floor(trayBounds.height / 2),
+  });
+  const work = display.workArea;
+
+  let x = Math.round(trayBounds.x + trayBounds.width / 2 - winBounds.width / 2);
+  x = Math.max(work.x + 8, Math.min(x, work.x + work.width - winBounds.width - 8));
+
+  let y;
+  if (trayBounds.y > work.y + work.height / 2) {
+    y = trayBounds.y - winBounds.height - 8;
+  } else {
+    y = trayBounds.y + trayBounds.height + 8;
+  }
+  y = Math.max(work.y + 8, Math.min(y, work.y + work.height - winBounds.height - 8));
+
+  popoverWindow.setPosition(x, y, false);
+}
+
+function togglePopover() {
+  if (!popoverWindow) return;
+  if (popoverWindow.isVisible()) {
+    popoverWindow.hide();
+    return;
+  }
+  if (Date.now() - lastPopoverBlurAt < 200) return;
+  positionPopover();
+  popoverWindow.show();
+  popoverWindow.focus();
+  sendPopoverState();
+}
+
+function sendPopoverState() {
+  if (!popoverWindow || popoverWindow.isDestroyed()) return;
+  const cfg = loadConfig();
+  popoverWindow.webContents.send('popover:state', {
+    overlayVisible: !!(mainWindow && mainWindow.isVisible()),
+    minimalMode: !!cfg.minimalMode,
+    opacity: cfg.opacity ?? 0.95,
+    isAuthenticated: spotify.isAuthenticated(),
+    hasClientId: !!ENV_CLIENT_ID,
+    playback: lastPlaybackPayload,
   });
 }
 
 // ---------- Polling Spotify ----------
+function broadcastPlayback(payload) {
+  lastPlaybackPayload = payload;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('playback:update', payload);
+  }
+  if (popoverWindow && !popoverWindow.isDestroyed()) {
+    popoverWindow.webContents.send('playback:update', payload);
+  }
+}
+
 function startPolling() {
   stopPolling();
   const tick = async () => {
     try {
       const playing = await spotify.getCurrentlyPlaying();
-      if (!mainWindow) return;
 
       if (!playing || !playing.item) {
-        mainWindow.webContents.send('playback:update', { playing: false });
+        broadcastPlayback({ playing: false });
         return;
       }
 
@@ -113,7 +236,7 @@ function startPolling() {
         lastTrackId = trackId;
         currentLyrics = null;
         isFetchingLyrics = true;
-        mainWindow.webContents.send('playback:update', { ...payload, lyrics: null, loadingLyrics: true });
+        broadcastPlayback({ ...payload, lyrics: null, loadingLyrics: true });
 
         try {
           const fetched = await lyrics.fetchLyrics({
@@ -125,30 +248,27 @@ function startPolling() {
           if (lastTrackId === trackId) {
             currentLyrics = fetched;
             isFetchingLyrics = false;
-            if (mainWindow) {
-              mainWindow.webContents.send('playback:update', { ...payload, lyrics: fetched, loadingLyrics: false });
-            }
+            broadcastPlayback({ ...payload, lyrics: fetched, loadingLyrics: false });
           }
-          // si la canción cambió mientras buscábamos, descartamos este resultado
         } catch (err) {
           if (lastTrackId === trackId) {
             isFetchingLyrics = false;
             currentLyrics = { synced: false, plain: null, lines: [], error: err.message };
-            if (mainWindow) {
-              mainWindow.webContents.send('playback:update', { ...payload, lyrics: currentLyrics, loadingLyrics: false });
-            }
+            broadcastPlayback({ ...payload, lyrics: currentLyrics, loadingLyrics: false });
           }
         }
       } else if (isFetchingLyrics) {
-        // Mismo track pero todavía buscando letras: mantener el estado de carga
-        mainWindow.webContents.send('playback:update', { ...payload, lyrics: null, loadingLyrics: true });
+        broadcastPlayback({ ...payload, lyrics: null, loadingLyrics: true });
       } else {
-        mainWindow.webContents.send('playback:update', { ...payload, lyrics: currentLyrics, loadingLyrics: false });
+        broadcastPlayback({ ...payload, lyrics: currentLyrics, loadingLyrics: false });
       }
     } catch (err) {
       console.error('[poll] error:', err.message);
       if (mainWindow) {
         mainWindow.webContents.send('playback:error', { message: err.message });
+      }
+      if (popoverWindow && !popoverWindow.isDestroyed()) {
+        popoverWindow.webContents.send('playback:error', { message: err.message });
       }
     }
   };
@@ -175,20 +295,21 @@ ipcMain.handle('app:getStatus', () => {
     clickThrough: cfg.clickThrough ?? false,
     opacity: cfg.opacity ?? 0.95,
     minimalMode: cfg.minimalMode ?? false,
+    overlayVisible: !!(mainWindow && mainWindow.isVisible()),
   };
 });
 
+ipcMain.handle('app:getPlayback', () => lastPlaybackPayload);
+
 ipcMain.handle('spotify:authenticate', async () => {
   if (!ENV_CLIENT_ID) {
-    return {
-      ok: false,
-      error: 'Falta SPOTIFY_CLIENT_ID en el archivo .env del proyecto.',
-    };
+    return { ok: false, error: 'Falta SPOTIFY_CLIENT_ID en el archivo .env del proyecto.' };
   }
   spotify.setClientId(ENV_CLIENT_ID);
   try {
     await spotify.authenticate({ openUrl: (url) => shell.openExternal(url) });
     startPolling();
+    sendPopoverState();
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -198,20 +319,33 @@ ipcMain.handle('spotify:authenticate', async () => {
 ipcMain.handle('spotify:logout', () => {
   spotify.logout();
   stopPolling();
-  if (mainWindow) {
-    mainWindow.webContents.send('playback:update', { playing: false });
-  }
+  broadcastPlayback({ playing: false });
+  sendPopoverState();
   return { ok: true };
 });
 
-ipcMain.handle('window:minimize', () => mainWindow?.minimize());
-ipcMain.handle('window:close', () => mainWindow?.close());
+ipcMain.handle('window:hideOverlay', () => {
+  if (mainWindow) mainWindow.hide();
+});
 
-ipcMain.handle('window:setClickThrough', (_e, enabled) => {
+ipcMain.handle('window:showOverlay', () => {
+  if (mainWindow) {
+    mainWindow.show();
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+  }
+});
+
+ipcMain.handle('window:toggleOverlay', () => {
   if (!mainWindow) return;
-  mainWindow.setIgnoreMouseEvents(!!enabled, { forward: true });
-  const cfg = loadConfig();
-  saveConfig({ ...cfg, clickThrough: !!enabled });
+  if (mainWindow.isVisible()) mainWindow.hide();
+  else {
+    mainWindow.show();
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+  }
+});
+
+ipcMain.handle('window:close', () => {
+  if (mainWindow) mainWindow.hide();
 });
 
 ipcMain.handle('window:setOpacity', (_e, value) => {
@@ -226,51 +360,54 @@ function applyMinimalMode(enabled) {
   if (!mainWindow) return;
   const cfg = loadConfig();
   saveConfig({ ...cfg, minimalMode: !!enabled, clickThrough: !!enabled });
-  // En modo minimal NO usamos forward:true para evitar que el cursor "despierte" la UI.
   mainWindow.setIgnoreMouseEvents(!!enabled, { forward: false });
   mainWindow.setHasShadow(false);
   mainWindow.webContents.send('settings:minimalMode', !!enabled);
   mainWindow.webContents.send('settings:clickThrough', !!enabled);
   rebuildTrayMenu();
+  sendPopoverState();
 }
 
 ipcMain.handle('window:setMinimalMode', (_e, enabled) => {
   applyMinimalMode(!!enabled);
 });
 
+ipcMain.handle('popover:close', () => {
+  if (popoverWindow && popoverWindow.isVisible()) popoverWindow.hide();
+});
+
+ipcMain.handle('app:quit', () => {
+  app.isQuitting = true;
+  app.quit();
+});
+
 // ---------- System Tray ----------
 function rebuildTrayMenu() {
   if (!tray) return;
-  const cfg = loadConfig();
-  const minimal = !!cfg.minimalMode;
+  const overlayVisible = !!(mainWindow && mainWindow.isVisible());
   const menu = Menu.buildFromTemplate([
     {
-      label: 'Mostrar / Ocultar ventana',
+      label: overlayVisible ? 'Ocultar letras' : 'Mostrar letras',
       click: () => {
         if (!mainWindow) return;
         if (mainWindow.isVisible()) mainWindow.hide();
-        else mainWindow.show();
+        else {
+          mainWindow.show();
+          mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        }
       },
     },
     { type: 'separator' },
     {
-      label: minimal ? '✓  Modo flotante puro' : '   Modo flotante puro',
-      click: () => applyMinimalMode(!minimal),
-    },
-    {
-      label: 'Atajos: Ctrl+Alt+M (flotante)  ·  Ctrl+Alt+H (ocultar)',
-      enabled: false,
-    },
-    { type: 'separator' },
-    {
-      label: 'Salir de Kuidy Lyrics',
+      label: 'Salir',
       click: () => {
+        app.isQuitting = true;
         app.quit();
       },
     },
   ]);
   tray.setContextMenu(menu);
-  tray.setToolTip(minimal ? 'Kuidy Lyrics — modo flotante' : 'Kuidy Lyrics');
+  tray.setToolTip('Kuidy Lyrics');
 }
 
 function createTray() {
@@ -278,17 +415,16 @@ function createTray() {
   const icon = nativeImage.createFromPath(iconPath);
   tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
   tray.setToolTip('Kuidy Lyrics');
-  // Click izquierdo: alterna visibilidad de ventana
-  tray.on('click', () => {
-    if (!mainWindow) return;
-    if (mainWindow.isVisible()) mainWindow.hide();
-    else mainWindow.show();
+
+  // Left click: toggle Herd-style popover (no longer hides the overlay)
+  tray.on('click', togglePopover);
+
+  // Right click on Windows opens the context menu automatically via setContextMenu,
+  // but on some setups it doesn't pop up unless we trigger it explicitly.
+  tray.on('right-click', () => {
+    tray.popUpContextMenu();
   });
-  // Doble click: alterna modo flotante (acceso rápido)
-  tray.on('double-click', () => {
-    const c = loadConfig();
-    applyMinimalMode(!(c.minimalMode ?? false));
-  });
+
   rebuildTrayMenu();
 }
 
@@ -298,26 +434,18 @@ app.whenReady().then(() => {
   spotify.loadTokensFromDisk();
 
   createWindow();
+  createPopoverWindow();
   createTray();
 
-  // Global hotkey: Ctrl+Alt+L toggles click-through mode
-  globalShortcut.register('Control+Alt+L', () => {
-    if (!mainWindow) return;
-    const cfg = loadConfig();
-    const next = !(cfg.clickThrough ?? false);
-    mainWindow.setIgnoreMouseEvents(next, { forward: true });
-    saveConfig({ ...cfg, clickThrough: next });
-    mainWindow.webContents.send('settings:clickThrough', next);
-  });
-
-  // Global hotkey: Ctrl+Alt+H hides/shows
   globalShortcut.register('Control+Alt+H', () => {
     if (!mainWindow) return;
     if (mainWindow.isVisible()) mainWindow.hide();
-    else mainWindow.show();
+    else {
+      mainWindow.show();
+      mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    }
   });
 
-  // Global hotkey: Ctrl+Alt+M toggles minimal floating mode
   globalShortcut.register('Control+Alt+M', () => {
     const c = loadConfig();
     applyMinimalMode(!(c.minimalMode ?? false));
@@ -333,7 +461,11 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  // Keep the app alive in the tray; do nothing here.
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
 });
 
 app.on('will-quit', () => {

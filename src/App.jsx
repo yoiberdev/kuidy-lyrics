@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import TitleBar from './components/TitleBar.jsx';
 import SetupView from './components/SetupView.jsx';
 import LyricsView from './components/LyricsView.jsx';
+import PopoverView from './components/PopoverView.jsx';
 import { extractPalette } from './lib/colors.js';
 
 const DEFAULT_PALETTE = {
@@ -14,7 +15,17 @@ const DEFAULT_PALETTE = {
   accentRgb: '196,181,253',
 };
 
+const isPopover =
+  typeof window !== 'undefined' && window.location.hash.replace(/^#/, '') === 'popover';
+
 export default function App() {
+  if (isPopover) {
+    return <PopoverView />;
+  }
+  return <OverlayApp />;
+}
+
+function OverlayApp() {
   const [status, setStatus] = useState(null);
   const [playback, setPlayback] = useState(null);
   const [error, setError] = useState(null);
@@ -39,7 +50,6 @@ export default function App() {
     };
   }, []);
 
-  // Re-extraer paleta cuando cambia el album art
   useEffect(() => {
     const art = playback?.track?.albumArt;
     if (!art) {
@@ -99,17 +109,7 @@ export default function App() {
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.2 }}
             >
-              <TitleBar
-                onClose={() => window.kuidy.close()}
-                onMinimize={() => window.kuidy.minimize()}
-                status={status}
-                minimal={minimal}
-                onLogout={async () => {
-                  await window.kuidy.logout();
-                  await refreshStatus();
-                  setPlayback(null);
-                }}
-              />
+              <TitleBar onClose={() => window.kuidy.close()} />
             </motion.div>
           )}
         </AnimatePresence>

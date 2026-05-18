@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('kuidy', {
   getStatus: () => ipcRenderer.invoke('app:getStatus'),
+  getPlayback: () => ipcRenderer.invoke('app:getPlayback'),
   authenticate: () => ipcRenderer.invoke('spotify:authenticate'),
   logout: () => ipcRenderer.invoke('spotify:logout'),
 
@@ -25,10 +26,19 @@ contextBridge.exposeInMainWorld('kuidy', {
     ipcRenderer.on('settings:minimalMode', handler);
     return () => ipcRenderer.removeListener('settings:minimalMode', handler);
   },
+  onPopoverState: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('popover:state', handler);
+    return () => ipcRenderer.removeListener('popover:state', handler);
+  },
 
-  minimize: () => ipcRenderer.invoke('window:minimize'),
   close: () => ipcRenderer.invoke('window:close'),
-  setClickThrough: (enabled) => ipcRenderer.invoke('window:setClickThrough', enabled),
+  hideOverlay: () => ipcRenderer.invoke('window:hideOverlay'),
+  showOverlay: () => ipcRenderer.invoke('window:showOverlay'),
+  toggleOverlay: () => ipcRenderer.invoke('window:toggleOverlay'),
   setOpacity: (value) => ipcRenderer.invoke('window:setOpacity', value),
   setMinimalMode: (enabled) => ipcRenderer.invoke('window:setMinimalMode', enabled),
+
+  closePopover: () => ipcRenderer.invoke('popover:close'),
+  quit: () => ipcRenderer.invoke('app:quit'),
 });
