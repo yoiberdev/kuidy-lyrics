@@ -58,21 +58,30 @@ async function lrclibSearch({ track, artist }) {
   return resp.json();
 }
 
+// Mejor candidato de una búsqueda: sincronizada primero (los registros basura
+// de lrclib —páginas scrapeadas, anotaciones— casi siempre son solo texto
+// plano) y, a igualdad, la más cercana en duración a la pista real.
+function pickBestCandidate(candidates, durationSec) {
+  if (!candidates || candidates.length === 0) return null;
+  const scored = candidates.map((c) => ({
+    c,
+    synced: c.syncedLyrics ? 1 : 0,
+    dDiff:
+      durationSec && c.duration ? Math.abs(c.duration - durationSec) : Number.MAX_SAFE_INTEGER,
+  }));
+  scored.sort((a, b) => b.synced - a.synced || a.dDiff - b.dDiff);
+  return scored[0].c;
+}
+
 async function fetchLyrics({ track, artist, album, durationSec }) {
   try {
     let result = await lrclibGet({ track, artist, album, durationSec });
-    if (!result) {
+    // Aunque el /get exacto responda, si no trae letra sincronizada intentamos
+    // encontrar algo mejor: la coincidencia exacta puede ser un registro basura.
+    if (!result || !result.syncedLyrics) {
       const candidates = await lrclibSearch({ track, artist });
-      if (candidates && candidates.length > 0) {
-        // Prefer one closest in duration if we know it
-        let best = candidates[0];
-        if (durationSec) {
-          best = candidates.reduce((acc, c) => {
-            const diff = Math.abs((c.duration || 0) - durationSec);
-            const accDiff = Math.abs((acc.duration || 0) - durationSec);
-            return diff < accDiff ? c : acc;
-          }, candidates[0]);
-        }
+      const best = pickBestCandidate(candidates, durationSec);
+      if (best && (best.syncedLyrics || !result)) {
         result = best;
       }
     }
