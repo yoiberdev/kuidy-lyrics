@@ -4,6 +4,7 @@ import TitleBar from './components/TitleBar.jsx';
 import SetupView from './components/SetupView.jsx';
 import LyricsView from './components/LyricsView.jsx';
 import PopoverView from './components/PopoverView.jsx';
+import GuideView from './components/GuideView.jsx';
 import { extractPalette } from './lib/colors.js';
 
 const DEFAULT_PALETTE = {
@@ -28,27 +29,52 @@ export default function App() {
 function OverlayApp() {
   const [status, setStatus] = useState(null);
   const [playback, setPlayback] = useState(null);
+  const [lyricsState, setLyricsState] = useState({ lyrics: null, loadingLyrics: false });
   const [error, setError] = useState(null);
   const [palette, setPalette] = useState(DEFAULT_PALETTE);
   const [minimal, setMinimal] = useState(false);
+  const [prefs, setPrefs] = useState({ showSubs: true, fontScale: 1 });
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     window.kuidy.getStatus().then((s) => {
       setStatus(s);
       if (s?.minimalMode) setMinimal(true);
+      setPrefs({ showSubs: s?.showSubs !== false, fontScale: s?.fontScale || 1 });
+      if (s && s.guideSeen === false) setShowGuide(true);
+    });
+    // La letra ya puede estar cargada si la ventana se abre a mitad de canción.
+    window.kuidy.getLyrics?.().then((l) => {
+      if (l) setLyricsState(l);
     });
     const offPlay = window.kuidy.onPlayback((data) => {
       setPlayback(data);
       setError(null);
     });
+    const offLyrics = window.kuidy.onLyrics?.((data) => setLyricsState(data));
     const offErr = window.kuidy.onPlaybackError((e) => setError(e.message));
     const offMin = window.kuidy.onMinimalModeChange?.((v) => setMinimal(!!v));
+    const offPrefs = window.kuidy.onPrefs?.((p) =>
+      setPrefs((prev) => ({
+        showSubs: p.showSubs !== false,
+        fontScale: p.fontScale || prev.fontScale,
+      }))
+    );
+    const offGuide = window.kuidy.onGuideShow?.(() => setShowGuide(true));
     return () => {
       offPlay?.();
+      offLyrics?.();
       offErr?.();
       offMin?.();
+      offPrefs?.();
+      offGuide?.();
     };
   }, []);
+
+  const closeGuide = (dontShowAgain) => {
+    setShowGuide(false);
+    window.kuidy.guideDismissed?.(dontShowAgain);
+  };
 
   useEffect(() => {
     const art = playback?.track?.albumArt;
@@ -138,14 +164,20 @@ function OverlayApp() {
               >
                 <LyricsView
                   playback={playback}
+                  lyricsState={lyricsState}
                   error={error}
                   palette={palette}
                   minimal={minimal}
+                  prefs={prefs}
                 />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
+
+        <AnimatePresence>
+          {showGuide && <GuideView onClose={closeGuide} />}
+        </AnimatePresence>
       </div>
     </div>
   );

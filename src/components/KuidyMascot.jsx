@@ -1,9 +1,13 @@
+import { useId } from 'react';
+
 export default function KuidyMascot({ size = 20, animated = true, palette }) {
   // Colores por defecto (violeta/fucsia/coral). Si llega paleta del álbum, la usamos.
   const c1 = palette?.accent || '#c4b5fd';
   const c2 = palette?.muted || '#f0abfc';
   const c3 = '#fda4af';
-  const id = `kg-${Math.round((palette?.vibrantRgb?.length ?? 0) * 13)}`;
+  // Los ids SVG son globales al documento: useId garantiza que dos mascotas con
+  // paletas distintas no compartan gradiente. Sin los ":" que url(#) no admite.
+  const id = `kg-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
   return (
     <svg

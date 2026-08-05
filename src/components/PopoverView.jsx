@@ -36,8 +36,11 @@ export default function PopoverView() {
     overlayVisible: true,
     minimalMode: false,
     opacity: 0.95,
+    showSubs: true,
+    fontScale: 1,
     isAuthenticated: false,
     hasClientId: false,
+    openAtLogin: false,
     playback: { playing: false },
   });
   const [authing, setAuthing] = useState(false);
@@ -51,8 +54,11 @@ export default function PopoverView() {
         overlayVisible: s.overlayVisible,
         minimalMode: s.minimalMode,
         opacity: s.opacity,
+        showSubs: s.showSubs !== false,
+        fontScale: s.fontScale || 1,
         isAuthenticated: s.isAuthenticated,
         hasClientId: s.hasClientId,
+        openAtLogin: !!s.openAtLogin,
         playback: pb || { playing: false },
       }));
     };
@@ -87,6 +93,23 @@ export default function PopoverView() {
   const updateOpacity = (v) => {
     setState((p) => ({ ...p, opacity: v }));
     window.kuidy.setOpacity(v);
+  };
+
+  const toggleOpenAtLogin = () => {
+    const next = !state.openAtLogin;
+    setState((p) => ({ ...p, openAtLogin: next }));
+    window.kuidy.setOpenAtLogin(next);
+  };
+
+  const toggleSubs = () => {
+    const next = !state.showSubs;
+    setState((p) => ({ ...p, showSubs: next }));
+    window.kuidy.setShowSubs(next);
+  };
+
+  const updateFontScale = (v) => {
+    setState((p) => ({ ...p, fontScale: v }));
+    window.kuidy.setFontScale(v);
   };
 
   const connect = async () => {
@@ -205,6 +228,65 @@ export default function PopoverView() {
               </div>
               <ToggleVisual checked={state.minimalMode} accent="bg-fuchsia-500" />
             </Row>
+
+            <Row onClick={toggleSubs}>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[12px] font-medium text-white/90">
+                  Sub-líneas de letra
+                </span>
+                <span className="text-[10px] text-white/40">
+                  Romaji o traducción bajo cada frase
+                </span>
+              </div>
+              <ToggleVisual checked={state.showSubs} accent="bg-violet-500" />
+            </Row>
+
+            <Row onClick={toggleOpenAtLogin}>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[12px] font-medium text-white/90">
+                  Iniciar con Windows
+                </span>
+                <span className="text-[10px] text-white/40">
+                  Abrir Kuidy al encender el equipo
+                </span>
+              </div>
+              <ToggleVisual checked={state.openAtLogin} accent="bg-sky-500" />
+            </Row>
+
+            <Row
+              onClick={() => {
+                window.kuidy.showGuide();
+                window.kuidy.closePopover();
+              }}
+            >
+              <div className="flex flex-col min-w-0">
+                <span className="text-[12px] font-medium text-white/90">
+                  Guía de atajos
+                </span>
+                <span className="text-[10px] text-white/40">
+                  Ctrl+Alt+H, Ctrl+Alt+M y más
+                </span>
+              </div>
+              <span className="text-[13px] text-white/30 shrink-0">›</span>
+            </Row>
+
+            <div className="px-3 pt-3 pb-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-medium text-white/80">Tamaño de letra</span>
+                <span className="text-[10px] text-white/45 tabular-nums">
+                  {Math.round(state.fontScale * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0.8"
+                max="1.6"
+                step="0.05"
+                value={state.fontScale}
+                onChange={(e) => updateFontScale(parseFloat(e.target.value))}
+                className="w-full accent-violet-400"
+              />
+            </div>
 
             <div className="px-3 pt-3 pb-1">
               <div className="flex items-center justify-between mb-1.5">

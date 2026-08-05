@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 function findCurrentLineIndex(lines, posMs) {
@@ -18,16 +18,34 @@ function findCurrentLineIndex(lines, posMs) {
   return ans;
 }
 
-export default function LyricsView({ playback, error, palette, minimal }) {
-  const [localPos, setLocalPos] = useState(0);
+export default function LyricsView({ playback, lyricsState, error, palette, minimal, prefs }) {
+  const lyrics = lyricsState?.lyrics || null;
+  const loadingLyrics = !!lyricsState?.loadingLyrics;
+  const lines = lyrics?.lines || [];
+  const synced = !!(lyrics?.synced && lines.length > 0);
+
+  const showSubs = prefs?.showSubs !== false;
+  const fontScale = prefs?.fontScale || 1;
+  // Tamaños en px reales escalados por la preferencia del usuario. El énfasis
+  // de la línea activa se hace con font-size, no con transform: scale(), que
+  // rasteriza el texto ya pintado y lo emborrona.
+  const px = (n) => Math.round(n * fontScale * 10) / 10;
+
+  const [currentIdx, setCurrentIdx] = useState(-1);
   const lastSyncRef = useRef({ at: 0, pos: 0, playing: false });
+  const linesRef = useRef([]);
   const containerRef = useRef(null);
   const activeRef = useRef(null);
 
   useEffect(() => {
+    linesRef.current = synced ? lines : [];
+  }, [lines, synced]);
+
+  // Resincroniza la posición con cada tick del poll y recalcula la línea activa.
+  useEffect(() => {
     if (!playback || !playback.playing) {
       lastSyncRef.current = { at: Date.now(), pos: 0, playing: false };
-      setLocalPos(0);
+      setCurrentIdx(-1);
       return;
     }
     lastSyncRef.current = {
@@ -35,26 +53,28 @@ export default function LyricsView({ playback, error, palette, minimal }) {
       pos: playback.progressMs || 0,
       playing: !!playback.isPlaying,
     };
-    setLocalPos(playback.progressMs || 0);
-  }, [playback?.progressMs, playback?.track?.id, playback?.isPlaying, playback?.playing]);
+    setCurrentIdx(findCurrentLineIndex(linesRef.current, playback.progressMs || 0));
+  }, [playback?.progressMs, playback?.track?.id, playback?.isPlaying, playback?.playing, synced]);
 
+  // Entre ticks del poll, el rAF interpola la posición pero solo hace setState
+  // cuando cambia la línea activa: re-renderizar toda la letra a 60fps cuando
+  // la línea cambia cada ~3s sería trabajo tirado. En pausa o sin letra
+  // sincronizada el loop ni siquiera corre.
+  const isActivePlayback = !!(playback?.playing && playback?.isPlaying);
   useEffect(() => {
+    if (!isActivePlayback || !synced) return;
     let raf;
     const tick = () => {
       const { at, pos, playing } = lastSyncRef.current;
-      if (playing) setLocalPos(pos + (Date.now() - at));
+      if (playing) {
+        const idx = findCurrentLineIndex(linesRef.current, pos + (Date.now() - at));
+        setCurrentIdx((prev) => (prev === idx ? prev : idx));
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
-
-  const synced = playback?.lyrics?.synced && playback?.lyrics?.lines?.length > 0;
-  const lines = playback?.lyrics?.lines || [];
-  const currentIdx = useMemo(
-    () => (synced ? findCurrentLineIndex(lines, localPos) : -1),
-    [synced, lines, localPos]
-  );
+  }, [isActivePlayback, synced]);
 
   useEffect(() => {
     if (!synced || !activeRef.current || !containerRef.current) return;
@@ -105,7 +125,7 @@ export default function LyricsView({ playback, error, palette, minimal }) {
     );
   }
 
-  const { track, lyrics, loadingLyrics, isPlaying } = playback;
+  const { track, isPlaying } = playback;
 
   return (
     <div className="h-full flex flex-col">
@@ -172,23 +192,24 @@ export default function LyricsView({ playback, error, palette, minimal }) {
                   <div
                     key={i}
                     ref={isActive ? activeRef : null}
-                    className="text-center transition-all duration-300 will-change-transform"
+                    className="text-center transition-opacity duration-300"
                     style={{
                       opacity: isActive ? 1 : Math.max(minimal ? 0 : 0.12, 0.7 - distance * 0.22),
-                      transform: isActive ? 'scale(1.04)' : 'scale(1)',
                     }}
                   >
                     <span
                       className={
                         isActive
                           ? minimal
-                            ? 'text-[20px] font-bold text-white'
-                            : 'text-[15px] font-semibold text-white'
+                            ? 'font-bold text-white'
+                            : 'font-semibold text-white'
                           : minimal
-                          ? 'text-[14px] text-white/80 font-medium'
-                          : 'text-[12px] text-white/55'
+                          ? 'text-white/80 font-medium'
+                          : 'text-white/55'
                       }
                       style={{
+                        fontSize: `${px(isActive ? (minimal ? 20 : 15) : minimal ? 14 : 12)}px`,
+                        transition: 'font-size 0.25s ease, color 0.25s ease',
                         textShadow: minimal
                           ? isActive
                             ? activeMinimalShadow
@@ -201,6 +222,26 @@ export default function LyricsView({ playback, error, palette, minimal }) {
                     >
                       {line.text || '♪'}
                     </span>
+                    {showSubs && line.sub && (
+                      <div
+                        className={
+                          isActive
+                            ? minimal
+                              ? 'text-white/90 mt-0.5'
+                              : 'text-white/70 mt-0.5'
+                            : minimal
+                            ? 'text-white/60'
+                            : 'text-white/35'
+                        }
+                        style={{
+                          fontSize: `${px(isActive ? (minimal ? 13 : 11) : minimal ? 11 : 10)}px`,
+                          transition: 'font-size 0.25s ease',
+                          textShadow: minimal ? minimalShadow : 'none',
+                        }}
+                      >
+                        {line.sub}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -221,10 +262,13 @@ export default function LyricsView({ playback, error, palette, minimal }) {
               <div
                 className={
                   minimal
-                    ? 'text-[14px] leading-relaxed text-white whitespace-pre-wrap font-medium'
-                    : 'text-[12px] leading-relaxed text-white/75 whitespace-pre-wrap'
+                    ? 'leading-relaxed text-white whitespace-pre-wrap font-medium'
+                    : 'leading-relaxed text-white/75 whitespace-pre-wrap'
                 }
-                style={{ textShadow: minimal ? minimalShadow : 'none' }}
+                style={{
+                  fontSize: `${px(minimal ? 14 : 12)}px`,
+                  textShadow: minimal ? minimalShadow : 'none',
+                }}
               >
                 {lyrics.plain}
               </div>
