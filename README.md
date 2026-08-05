@@ -6,7 +6,23 @@ Overlay flotante de letras de Spotify para Windows. Ventana transparente, siempr
 
 - **Detección de canción**: usa la Spotify Web API (`/me/player/currently-playing`) — devuelve la pista y el progreso en ms con exactitud.
 - **Letras**: las saca de [lrclib.net](https://lrclib.net) (gratis, sin API key, con letras sincronizadas en formato LRC).
+- **Sub-líneas automáticas**: para canciones en japonés genera la lectura **romaji** debajo de cada frase (kuroshiro + kuromoji, offline); para canciones en otros idiomas muestra la **traducción al español**. Se puede desactivar desde el popover.
 - **UI**: Electron + React + Tailwind + Framer Motion, con glassmorphism.
+
+## Arquitectura
+
+El proceso main está dividido en módulos bajo `electron/`:
+
+| Módulo | Responsabilidad |
+| --- | --- |
+| `main.js` | Bootstrap: dotenv, single-instance lock, ciclo de vida, atajos globales |
+| `context.js` | Estado compartido (refs de ventanas, tray, últimos payloads) |
+| `windows.js` | Overlay y popover: creación, posicionamiento, modo flotante |
+| `tray.js` | Icono de bandeja y menú contextual |
+| `poller.js` | Polling adaptativo de Spotify y broadcasts IPC |
+| `subtitles.js` | Sub-líneas: detección de idioma, romaji y traducción |
+| `ipc.js` | Handlers de `ipcMain` |
+| `config.js` | Config persistida con defaults y tokens cifrados (safeStorage/DPAPI) |
 
 ## Setup (primera vez)
 
@@ -54,12 +70,13 @@ Click en "Conectar Spotify", autorizas en el navegador, y listo — el `.env` se
 
 ## Uso
 
-- **Arrastrar la ventana**: arrastra desde la barra superior.
-- **Redimensionar**: arrastra los bordes.
+Al abrir la app por primera vez aparece una guía con los atajos (se puede reabrir desde el popover → "Guía de atajos").
+
+- **Arrastrar la ventana**: arrastra desde la barra superior. **Redimensionar**: arrastra los bordes.
 - **Atajos globales** (funcionan incluso dentro de juegos):
-  - `Ctrl + Alt + L` — alterna *click-through* (los clicks pasan a la ventana de debajo).
-  - `Ctrl + Alt + H` — oculta/muestra la ventana.
-- **Opacidad y opciones**: click en los tres puntos (`···`) arriba a la derecha.
+  - `Ctrl + Alt + H` — oculta/muestra la ventana de letras.
+  - `Ctrl + Alt + M` — modo flotante puro: solo la letra, los clicks la atraviesan.
+- **Popover de la bandeja** (click en el icono junto al reloj): mostrar/ocultar overlay, modo flotante, sub-líneas, iniciar con Windows, tamaño de letra, opacidad, guía de atajos y sesión de Spotify. Click derecho: menú rápido.
 
 ## Empaquetar como `.exe` instalable
 
@@ -71,6 +88,8 @@ El instalador queda en `release/`.
 
 ## Notas
 
-- La app guarda tu Client ID y tokens en `%APPDATA%\Kuidy Lyrics\`. Bórralo si quieres reiniciar la config.
+- La config vive en `%APPDATA%\kuidy-lyrics\kuidy-config.json` y los tokens en `kuidy-tokens.json`, **cifrados con DPAPI** (safeStorage). Borra esos archivos si quieres reiniciar la config.
+- El instalador incluye el `.env` como recurso (`build.extraResources`), así el Client ID viaja con la app empaquetada. Con PKCE el Client ID no es secreto — nunca pongas un client secret en el `.env`.
+- La cuenta que autorizas en Kuidy debe ser **la misma** en la que suena la música; si el overlay dice "no se está reproduciendo nada" con música sonando, revisa con qué cuenta está logueado tu reproductor.
 - Si Spotify devuelve **403** la primera vez, asegúrate de haber añadido tu email en *User Management* en el dashboard.
 - Para juegos en **fullscreen exclusivo** (algunos DirectX antiguos) el overlay puede no aparecer encima — la mayoría de juegos modernos usan *borderless* y funciona perfectamente.
