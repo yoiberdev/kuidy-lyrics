@@ -16,6 +16,9 @@
   "dependencies": {
     "dotenv": "^17.4.2",
     "framer-motion": "^11.11.7",
+    "google-translate-api-x": "^10.7.3",
+    "kuroshiro": "^1.2.0",
+    "kuroshiro-analyzer-kuromoji": "^1.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -42,8 +45,12 @@
       "dist/**/*",
       "package.json"
     ],
+    "extraResources": [
+      ".env"
+    ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.png"
     }
   }
 }

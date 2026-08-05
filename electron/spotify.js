@@ -36,8 +36,26 @@ function generatePkcePair() {
   return { verifier, challenge };
 }
 
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function startCallbackServer(expectedState) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    let timer = null;
+    const settle = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(value);
+    };
+
     const server = http.createServer((req, res) => {
       try {
         const u = new URL(req.url, 'http://127.0.0.1:8888');
@@ -56,32 +74,32 @@ function startCallbackServer(expectedState) {
 h1{margin:0 0 8px;font-size:22px;font-weight:600}p{margin:0;color:#9a9aae;font-size:14px}
 .ok{color:#7dd3a0}.err{color:#f87171}</style></head>
 <body><div class="card">
-${error ? `<h1 class="err">Algo falló</h1><p>${error}</p>` : `<h1 class="ok">¡Conectado!</h1><p>Ya puedes cerrar esta pestaña y volver a Kuidy Lyrics.</p>`}
+${error ? `<h1 class="err">Algo falló</h1><p>${escapeHtml(error)}</p>` : `<h1 class="ok">¡Conectado!</h1><p>Ya puedes cerrar esta pestaña y volver a Kuidy Lyrics.</p>`}
 </div></body></html>`;
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(html);
 
         server.close();
-        if (error) return reject(new Error(error));
-        if (!code) return reject(new Error('No se recibió el código de autorización.'));
-        if (state !== expectedState) return reject(new Error('State mismatch (posible CSRF).'));
-        resolve(code);
+        if (error) return settle(reject, new Error(error));
+        if (!code) return settle(reject, new Error('No se recibió el código de autorización.'));
+        if (state !== expectedState) return settle(reject, new Error('State mismatch (posible CSRF).'));
+        settle(resolve, code);
       } catch (err) {
         try {
           res.writeHead(500);
           res.end('error');
         } catch {}
-        reject(err);
+        settle(reject, err);
       }
     });
-    server.on('error', reject);
+    server.on('error', (err) => settle(reject, err));
     server.listen(8888, '127.0.0.1');
     // safety timeout: 5 minutes
-    setTimeout(() => {
+    timer = setTimeout(() => {
       try {
         server.close();
       } catch {}
-      reject(new Error('Tiempo de espera agotado para la autenticación.'));
+      settle(reject, new Error('Tiempo de espera agotado para la autenticación.'));
     }, 5 * 60 * 1000);
   });
 }
@@ -148,7 +166,13 @@ async function refreshAccessToken() {
   });
   if (!resp.ok) {
     const txt = await resp.text();
-    throw new Error(`Refresh error: ${resp.status} ${txt}`);
+    const err = new Error(`Refresh error: ${resp.status} ${txt}`);
+    // invalid_grant = refresh token revocado o caducado: la sesión ya no sirve
+    // y quien llama debe cerrar sesión en vez de reintentar.
+    if (resp.status === 400 && txt.includes('invalid_grant')) {
+      err.authRevoked = true;
+    }
+    throw err;
   }
   const data = await resp.json();
   tokens = {
