@@ -8,7 +8,9 @@ html, body, #root {
   padding: 0;
   background: transparent;
   color: #f5f5f7;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  /* Fuentes del sistema: una app de escritorio no debería pedirle a Google una
+     tipografía en cada arranque ni verse distinta sin internet. Windows primero. */
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
@@ -78,6 +80,13 @@ input { outline: none; }
   background-size: 200% 100%;
   animation: shimmer 2.5s linear infinite;
 }
+/* El keyframe vive aquí y no en tailwind.config: Tailwind solo emite @keyframes
+   para las animaciones cuyo utility (animate-shimmer) aparece en el marcado, y
+   aquí la clase que se usa es .shimmer, así que la barra se quedaba estática. */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
 
 /* Popover (tray menu) */
 .popover-shell {
@@ -115,4 +124,14 @@ input { outline: none; }
 .kuidy-note {
   animation: kuidy-note 1.8s ease-in-out infinite;
   transform-origin: 28px 8px;
+}
+
+/* Estos tres bucles corren mientras el overlay esté a la vista, o sea casi siempre.
+   Si el usuario pidió reducir el movimiento en Windows, se paran del todo. */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer,
+  .kuidy-bob,
+  .kuidy-note {
+    animation: none;
+  }
 }

@@ -1,5 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import KuidyMascot from './KuidyMascot.jsx';
+
+// Idiomas destino más probables de las sub-líneas. 'Automático' manda '' y el
+// main resuelve el idioma de Windows, así que el pill que se queda marcado
+// después es el del idioma detectado, no el de 'Automático'.
+const SUBS_LANGS = [
+  { code: '', label: 'Automático' },
+  { code: 'es', label: 'Español' },
+  { code: 'en', label: 'English' },
+  { code: 'pt', label: 'Português' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'it', label: 'Italiano' },
+];
 
 function ToggleVisual({ checked, accent = 'bg-emerald-500' }) {
   return (
@@ -31,103 +44,193 @@ function Row({ onClick, children, disabled }) {
   );
 }
 
+// Enlace al registro para las pantallas en las que todavía no hay menú: quien no
+// consigue configurar ni conectar es justo quien más necesita mandarnos el log.
+function LogsLink({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-[10px] text-white/35 hover:text-white/70 underline decoration-white/20 underline-offset-2 transition-colors"
+    >
+      Abrir carpeta de logs
+    </button>
+  );
+}
+
 export default function PopoverView() {
-  const [state, setState] = useState({
-    overlayVisible: true,
-    minimalMode: false,
-    opacity: 0.95,
-    showSubs: true,
-    fontScale: 1,
-    isAuthenticated: false,
-    hasClientId: false,
-    openAtLogin: false,
-    playback: { playing: false },
-  });
+  // El status del main es la única fuente de verdad: aquí solo se copia para
+  // pintar y se parchea en optimista mientras llega el eco por IPC.
+  const [status, setStatus] = useState(null);
+  const [playback, setPlayback] = useState({ playing: false });
   const [authing, setAuthing] = useState(false);
+  const [authError, setAuthError] = useState(null);
+  const [authNotice, setAuthNotice] = useState(null);
+  // Cancelar devuelve un fallo de authenticate que no es un problema: sin esto
+  // el usuario ve en rojo el resultado de algo que ha pedido él.
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
     const refresh = async () => {
-      const s = await window.kuidy.getStatus();
-      const pb = await window.kuidy.getPlayback().catch(() => ({ playing: false }));
-      setState((prev) => ({
-        ...prev,
-        overlayVisible: s.overlayVisible,
-        minimalMode: s.minimalMode,
-        opacity: s.opacity,
-        showSubs: s.showSubs !== false,
-        fontScale: s.fontScale || 1,
-        isAuthenticated: s.isAuthenticated,
-        hasClientId: s.hasClientId,
-        openAtLogin: !!s.openAtLogin,
-        playback: pb || { playing: false },
-      }));
+      // Sin catch, un fallo del invoke dejaba una promesa rechazada sin manejar
+      // y el popover con el estado anterior sin decir nada.
+      try {
+        const s = await window.kuidy.getStatus();
+        const pb = await window.kuidy.getPlayback().catch(() => null);
+        setStatus((prev) => ({ ...prev, ...s }));
+        setPlayback(pb || { playing: false });
+      } catch {
+        setAuthError('No pudimos leer el estado de Kuidy. Ciérralo desde la bandeja y ábrelo otra vez.');
+      }
     };
     refresh();
     const offState = window.kuidy.onPopoverState?.((data) => {
-      setState((prev) => ({ ...prev, ...data }));
+      if (!data) return;
+      const { playback: pb, ...rest } = data;
+      setStatus((prev) => (prev ? { ...prev, ...rest } : prev));
+      if (pb) setPlayback(pb);
+    });
+    // Sin esto el popover no se enteraba de los cambios que nacen fuera de él
+    // (bandeja, atajos, la propia ventana de letras) y se quedaba desfasado.
+    const offStatus = window.kuidy.onStatusChanged?.((s) => {
+      if (s) setStatus((prev) => ({ ...prev, ...s }));
     });
     const offPlay = window.kuidy.onPlayback((data) => {
-      setState((prev) => ({ ...prev, playback: data }));
+      setPlayback(data || { playing: false });
     });
     // Refresh whenever the popover gains focus (it's hidden between uses)
     const onFocus = () => refresh();
     window.addEventListener('focus', onFocus);
     return () => {
       offState?.();
+      offStatus?.();
       offPlay?.();
       window.removeEventListener('focus', onFocus);
     };
   }, []);
 
+  // Parche optimista sobre el status: el main confirma después por
+  // 'status:changed' o 'popover:state' y lo que valga es siempre lo suyo.
+  const patch = (fields) => setStatus((prev) => (prev ? { ...prev, ...fields } : prev));
+
+  const overlayVisible = !!status?.overlayVisible;
+  const minimalMode = !!status?.minimalMode;
+  const showSubs = status?.showSubs !== false;
+  const translateConsent = !!status?.translateConsent;
+  const openAtLogin = !!status?.openAtLogin;
+  const isAuthenticated = !!status?.isAuthenticated;
+  const hasClientId = !!status?.hasClientId;
+  const opacity = status?.opacity ?? 0.95;
+  const fontScale = status?.fontScale || 1;
+  const subsLang = status?.subsLang || '';
+
+  // Si el idioma resuelto no es ninguno de los habituales (locale japonés, ruso…)
+  // hay que enseñarlo igual o el usuario no vería marcado ninguno.
+  const langOptions = useMemo(() => {
+    const base = SUBS_LANGS.slice();
+    if (subsLang && !base.some((o) => o.code === subsLang)) {
+      base.push({ code: subsLang, label: subsLang.toUpperCase() });
+    }
+    return base;
+  }, [subsLang]);
+
   const toggleOverlay = () => {
+    patch({ overlayVisible: !overlayVisible });
     window.kuidy.toggleOverlay();
-    setState((p) => ({ ...p, overlayVisible: !p.overlayVisible }));
   };
 
   const toggleMinimal = () => {
-    const next = !state.minimalMode;
-    setState((p) => ({ ...p, minimalMode: next }));
-    window.kuidy.setMinimalMode(next);
+    patch({ minimalMode: !minimalMode });
+    window.kuidy.setMinimalMode(!minimalMode);
   };
 
   const updateOpacity = (v) => {
-    setState((p) => ({ ...p, opacity: v }));
+    patch({ opacity: v });
     window.kuidy.setOpacity(v);
   };
 
   const toggleOpenAtLogin = () => {
-    const next = !state.openAtLogin;
-    setState((p) => ({ ...p, openAtLogin: next }));
-    window.kuidy.setOpenAtLogin(next);
+    patch({ openAtLogin: !openAtLogin });
+    window.kuidy.setOpenAtLogin(!openAtLogin);
   };
 
   const toggleSubs = () => {
-    const next = !state.showSubs;
-    setState((p) => ({ ...p, showSubs: next }));
-    window.kuidy.setShowSubs(next);
+    patch({ showSubs: !showSubs });
+    window.kuidy.setShowSubs(!showSubs);
+  };
+
+  const toggleTranslate = () => {
+    patch({ translateConsent: !translateConsent });
+    window.kuidy.setTranslateConsent(!translateConsent);
+  };
+
+  const chooseLang = (code) => {
+    // Con 'Automático' (code '') el idioma real lo decide el main a partir del
+    // locale de Windows, así que ahí no se adelanta nada: se espera al status.
+    if (code) patch({ subsLang: code });
+    window.kuidy.setSubsLang(code);
   };
 
   const updateFontScale = (v) => {
-    setState((p) => ({ ...p, fontScale: v }));
+    patch({ fontScale: v });
     window.kuidy.setFontScale(v);
+  };
+
+  const openLogs = () => {
+    window.kuidy.openLogs?.();
+  };
+
+  // El asistente de Client ID vive en la ventana de letras: desde aquí solo se
+  // puede llevar al usuario hasta él.
+  const openSetup = async () => {
+    try {
+      await window.kuidy.showOverlay();
+    } finally {
+      window.kuidy.closePopover();
+    }
   };
 
   const connect = async () => {
     setAuthing(true);
+    setAuthError(null);
+    setAuthNotice(null);
+    cancelledRef.current = false;
     try {
-      await window.kuidy.authenticate();
+      // Antes se tiraba el resultado: fallar y acertar se veían exactamente
+      // igual, el botón dejaba de girar y no pasaba nada más.
+      const r = await window.kuidy.authenticate();
+      if (!r?.ok) {
+        if (cancelledRef.current) {
+          setAuthNotice('Conexión cancelada.');
+        } else {
+          setAuthError(r?.error || 'No se pudo conectar con Spotify. Vuelve a intentarlo.');
+        }
+      }
+    } catch (e) {
+      setAuthError(e?.message || 'No se pudo conectar con Spotify. Vuelve a intentarlo.');
     } finally {
       setAuthing(false);
     }
   };
 
+  const cancelConnect = async () => {
+    cancelledRef.current = true;
+    try {
+      await window.kuidy.cancelAuth?.();
+    } catch {
+      // El flujo se corta igual al caducar; no hay nada útil que contar aquí.
+    }
+  };
+
   const logout = async () => {
+    setAuthError(null);
+    setAuthNotice(null);
     await window.kuidy.logout();
   };
 
   const quit = () => window.kuidy.quit();
 
-  const track = state.playback?.playing ? state.playback.track : null;
+  const track = playback?.playing ? playback.track : null;
 
   return (
     <div className="popover-shell h-screen w-screen p-2">
@@ -140,7 +243,13 @@ export default function PopoverView() {
               Kuidy Lyrics
             </div>
             <div className="text-[10px] text-white/45 leading-tight truncate">
-              {state.isAuthenticated ? 'Spotify conectado' : 'Sin conectar'}
+              {!status
+                ? 'Cargando...'
+                : isAuthenticated
+                  ? 'Spotify conectado'
+                  : hasClientId
+                    ? 'Sin conectar'
+                    : 'Sin configurar'}
             </div>
           </div>
         </div>
@@ -165,7 +274,7 @@ export default function PopoverView() {
                 {track.artists?.join(', ')}
               </div>
             </div>
-            {!state.playback.isPlaying && (
+            {!playback.isPlaying && (
               <div className="text-[9px] uppercase tracking-wider text-white/35 shrink-0">
                 pausa
               </div>
@@ -176,32 +285,68 @@ export default function PopoverView() {
         <div className="mx-3 h-px bg-white/[0.07]" />
 
         {/* Body */}
-        {!state.hasClientId ? (
-          <div className="flex-1 px-4 py-4 text-center flex flex-col items-center justify-center gap-1">
-            <div className="text-[12px] font-medium text-rose-300">
-              Configuración incompleta
+        {!status ? (
+          // Hasta que llega el status no se sabe nada: pintar ya la pantalla de
+          // "falta tu Client ID" le daba un susto a quien lo tiene puesto.
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-20 h-1 rounded-full shimmer" />
+          </div>
+        ) : !hasClientId ? (
+          <div className="flex-1 px-4 py-4 text-center flex flex-col items-center justify-center gap-2">
+            <div className="text-[12px] font-medium text-white/90">
+              Falta tu Client ID de Spotify
             </div>
             <div className="text-[10px] text-white/55 leading-snug">
-              Falta el archivo <code className="text-white/80">.env</code> con{' '}
-              <code className="text-white/80">SPOTIFY_CLIENT_ID</code>.
+              Spotify solo permite 5 cuentas por app, así que Kuidy funciona con una app
+              tuya. El asistente está en la ventana de letras.
+            </div>
+            <button
+              onClick={openSetup}
+              className="mt-1 px-4 h-9 rounded-full text-[12px] font-medium text-white bg-white/12 hover:bg-white/20 transition-colors"
+            >
+              Abrir el asistente
+            </button>
+            <div className="mt-1">
+              <LogsLink onClick={openLogs} />
             </div>
           </div>
-        ) : !state.isAuthenticated ? (
+        ) : !isAuthenticated ? (
           <div className="flex-1 px-4 py-4 flex flex-col items-center justify-center gap-3">
             <div className="text-[11px] text-white/55 text-center leading-snug">
               Conecta tu cuenta de Spotify para empezar.
             </div>
-            <button
-              onClick={connect}
-              disabled={authing}
-              className="px-4 h-9 rounded-full text-[12px] font-medium text-white shadow-lg shadow-emerald-900/40 disabled:opacity-50 transition-colors"
-              style={{
-                background:
-                  'linear-gradient(135deg, #1ed760 0%, #14b85a 50%, #0fa548 100%)',
-              }}
-            >
-              {authing ? 'Esperando…' : 'Conectar Spotify'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={connect}
+                disabled={authing}
+                className="px-4 h-9 rounded-full text-[12px] font-medium text-white shadow-lg shadow-emerald-900/40 disabled:opacity-50 transition-colors"
+                style={{
+                  background:
+                    'linear-gradient(135deg, #1ed760 0%, #14b85a 50%, #0fa548 100%)',
+                }}
+              >
+                {authing ? 'Esperando…' : 'Conectar Spotify'}
+              </button>
+              {authing && (
+                <button
+                  onClick={cancelConnect}
+                  className="px-3 h-9 rounded-full text-[12px] text-white/70 hover:text-white bg-white/10 hover:bg-white/15 transition-colors"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
+            {authError && (
+              <div className="text-[10px] text-rose-300 text-center leading-snug">
+                {authError}
+              </div>
+            )}
+            {!authError && authNotice && (
+              <div className="text-[10px] text-white/50 text-center leading-snug">
+                {authNotice}
+              </div>
+            )}
+            <LogsLink onClick={openLogs} />
           </div>
         ) : (
           <div className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
@@ -214,10 +359,10 @@ export default function PopoverView() {
                   Ventana flotante always-on-top
                 </span>
               </div>
-              <ToggleVisual checked={state.overlayVisible} />
+              <ToggleVisual checked={overlayVisible} />
             </Row>
 
-            <Row onClick={toggleMinimal} disabled={!state.overlayVisible}>
+            <Row onClick={toggleMinimal} disabled={!overlayVisible}>
               <div className="flex flex-col min-w-0">
                 <span className="text-[12px] font-medium text-white/90">
                   Modo flotante puro
@@ -226,7 +371,7 @@ export default function PopoverView() {
                   Solo letra, ignora clicks
                 </span>
               </div>
-              <ToggleVisual checked={state.minimalMode} accent="bg-fuchsia-500" />
+              <ToggleVisual checked={minimalMode} accent="bg-fuchsia-500" />
             </Row>
 
             <Row onClick={toggleSubs}>
@@ -238,8 +383,49 @@ export default function PopoverView() {
                   Romaji o traducción bajo cada frase
                 </span>
               </div>
-              <ToggleVisual checked={state.showSubs} accent="bg-violet-500" />
+              <ToggleVisual checked={showSubs} accent="bg-violet-500" />
             </Row>
+
+            <Row onClick={toggleTranslate}>
+              <div className="flex flex-col min-w-0 pr-2">
+                <span className="text-[12px] font-medium text-white/90">
+                  Traducir letras
+                </span>
+                <span className="text-[10px] text-white/40 leading-snug">
+                  Manda la letra a Google Traductor. El romaji del japonés es local y
+                  funciona sin esto.
+                </span>
+              </div>
+              <ToggleVisual checked={translateConsent} accent="bg-amber-500" />
+            </Row>
+
+            <div className="px-3 pt-2 pb-1">
+              <div className="text-[11px] font-medium text-white/80 mb-1.5">
+                Idioma de las sub-líneas
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {langOptions.map((o) => {
+                  const active = o.code !== '' && o.code === subsLang;
+                  return (
+                    <button
+                      key={o.code || 'auto'}
+                      type="button"
+                      onClick={() => chooseLang(o.code)}
+                      className={`h-6 px-2 rounded-md text-[10px] font-medium transition-colors ${
+                        active
+                          ? 'bg-violet-500/30 text-violet-100'
+                          : 'bg-white/[0.07] text-white/60 hover:bg-white/15 hover:text-white/90'
+                      }`}
+                    >
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-[9px] text-white/35 mt-1 leading-snug">
+                «Automático» usa el idioma de Windows y marca el que detecte.
+              </div>
+            </div>
 
             <Row onClick={toggleOpenAtLogin}>
               <div className="flex flex-col min-w-0">
@@ -250,7 +436,7 @@ export default function PopoverView() {
                   Abrir Kuidy al encender el equipo
                 </span>
               </div>
-              <ToggleVisual checked={state.openAtLogin} accent="bg-sky-500" />
+              <ToggleVisual checked={openAtLogin} accent="bg-sky-500" />
             </Row>
 
             <Row
@@ -270,11 +456,23 @@ export default function PopoverView() {
               <span className="text-[13px] text-white/30 shrink-0">›</span>
             </Row>
 
+            <Row onClick={openLogs}>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[12px] font-medium text-white/90">
+                  Abrir carpeta de logs
+                </span>
+                <span className="text-[10px] text-white/40">
+                  El registro que hay que mandarnos si algo falla
+                </span>
+              </div>
+              <span className="text-[13px] text-white/30 shrink-0">›</span>
+            </Row>
+
             <div className="px-3 pt-3 pb-1">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[11px] font-medium text-white/80">Tamaño de letra</span>
                 <span className="text-[10px] text-white/45 tabular-nums">
-                  {Math.round(state.fontScale * 100)}%
+                  {Math.round(fontScale * 100)}%
                 </span>
               </div>
               <input
@@ -282,7 +480,7 @@ export default function PopoverView() {
                 min="0.8"
                 max="1.6"
                 step="0.05"
-                value={state.fontScale}
+                value={fontScale}
                 onChange={(e) => updateFontScale(parseFloat(e.target.value))}
                 className="w-full accent-violet-400"
               />
@@ -292,7 +490,7 @@ export default function PopoverView() {
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[11px] font-medium text-white/80">Opacidad</span>
                 <span className="text-[10px] text-white/45 tabular-nums">
-                  {Math.round(state.opacity * 100)}%
+                  {Math.round(opacity * 100)}%
                 </span>
               </div>
               <input
@@ -300,7 +498,7 @@ export default function PopoverView() {
                 min="0.3"
                 max="1"
                 step="0.05"
-                value={state.opacity}
+                value={opacity}
                 onChange={(e) => updateOpacity(parseFloat(e.target.value))}
                 className="w-full accent-fuchsia-400"
               />
@@ -309,21 +507,28 @@ export default function PopoverView() {
         )}
 
         {/* Footer actions */}
-        <div className="px-2 pt-2 pb-2 border-t border-white/[0.07] flex items-center gap-1">
-          {state.isAuthenticated && (
+        <div className="px-2 pt-2 pb-1.5 border-t border-white/[0.07]">
+          <div className="flex items-center gap-1">
+            {isAuthenticated && (
+              <button
+                onClick={logout}
+                className="flex-1 h-8 rounded-lg text-[11px] text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors"
+              >
+                Cerrar sesión
+              </button>
+            )}
             <button
-              onClick={logout}
-              className="flex-1 h-8 rounded-lg text-[11px] text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors"
+              onClick={quit}
+              className="flex-1 h-8 rounded-lg text-[11px] text-rose-300/90 hover:text-rose-200 hover:bg-rose-500/10 transition-colors"
             >
-              Cerrar sesión
+              Salir
             </button>
+          </div>
+          {status?.version && (
+            <div className="text-center text-[9px] text-white/25 tabular-nums pt-0.5">
+              v{status.version}
+            </div>
           )}
-          <button
-            onClick={quit}
-            className="flex-1 h-8 rounded-lg text-[11px] text-rose-300/90 hover:text-rose-200 hover:bg-rose-500/10 transition-colors"
-          >
-            Salir
-          </button>
         </div>
       </div>
     </div>

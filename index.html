@@ -3,13 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kuidy Lyrics</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-      rel="stylesheet"
+    <!--
+      El renderer no habla con la red por su cuenta: todo (Spotify, lrclib, traducción)
+      pasa por IPC al proceso main. Lo único externo son las carátulas de i.scdn.co.
+      'unsafe-inline' en style es inevitable: framer-motion y varios componentes
+      escriben estilos inline. connect-src abre 127.0.0.1:5173 solo para que el HMR
+      de Vite siga funcionando en desarrollo; empaquetado ese origen no existe.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' https://i.scdn.co data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws://127.0.0.1:5173 http://127.0.0.1:5173; font-src 'self'; object-src 'none'; base-uri 'none';"
     />
+    <title>Kuidy Lyrics</title>
   </head>
   <body class="bg-transparent overflow-hidden select-none">
     <div id="root"></div>
