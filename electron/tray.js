@@ -1,22 +1,42 @@
 const { app, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const ctx = require('./context');
+const log = require('./log');
+
+function toggleOverlay() {
+  const w = ctx.mainWindow;
+  if (!w || w.isDestroyed()) return;
+  if (w.isVisible()) w.hide();
+  else w.showInactive();
+}
 
 function rebuildTrayMenu() {
   const { tray, mainWindow } = ctx;
-  if (!tray) return;
-  const overlayVisible = !!(mainWindow && mainWindow.isVisible());
+  if (!tray || tray.isDestroyed()) return;
+  const overlayVisible = !!(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible());
+  const versionLabel = 'Kuidy Lyrics v' + app.getVersion();
+
   const menu = Menu.buildFromTemplate([
     {
       label: overlayVisible ? 'Ocultar letras' : 'Mostrar letras',
+      click: toggleOverlay,
+    },
+    { type: 'separator' },
+    {
+      // Un tester tiene que poder mandarnos el log sin ir a buscar
+      // %APPDATA% a mano: es la única traza que deja la app empaquetada.
+      label: 'Abrir carpeta de logs',
       click: () => {
-        const w = ctx.mainWindow;
-        if (!w) return;
-        if (w.isVisible()) w.hide();
-        else w.showInactive();
+        log.info('tray', 'el usuario abre la carpeta de logs', log.logDir());
+        Promise.resolve(log.openLogFolder()).catch((err) =>
+          log.warn('tray', 'no se pudo abrir la carpeta de logs', err)
+        );
       },
     },
     { type: 'separator' },
+    // Entrada informativa: al reportar un fallo, lo primero que necesitamos
+    // saber es qué build tiene instalada.
+    { label: versionLabel, enabled: false },
     {
       label: 'Salir',
       click: () => {
@@ -26,15 +46,24 @@ function rebuildTrayMenu() {
     },
   ]);
   tray.setContextMenu(menu);
-  tray.setToolTip('Kuidy Lyrics');
+  tray.setToolTip(versionLabel);
 }
 
 function createTray() {
   const iconPath = path.join(__dirname, 'tray-icon.png');
   const icon = nativeImage.createFromPath(iconPath);
-  const tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
+  let image = icon;
+
+  // Sin icono el usuario no tiene forma de llegar a la app: no hay ventana en
+  // la barra de tareas y el overlay puede estar oculto. No es motivo para
+  // caerse, pero sí para dejarlo escrito.
+  if (icon.isEmpty()) {
+    log.warn('tray', 'no se pudo cargar el icono de bandeja, se usa uno vacío', iconPath);
+    image = nativeImage.createEmpty();
+  }
+
+  const tray = new Tray(image);
   ctx.tray = tray;
-  tray.setToolTip('Kuidy Lyrics');
 
   // Click izquierdo: popover estilo Herd (require perezoso: windows.js también
   // importa de este módulo).
@@ -47,6 +76,7 @@ function createTray() {
   });
 
   rebuildTrayMenu();
+  log.info('tray', 'icono de bandeja creado');
 }
 
 module.exports = { createTray, rebuildTrayMenu };
