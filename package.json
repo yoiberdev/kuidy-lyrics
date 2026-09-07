@@ -1,10 +1,14 @@
 {
   "name": "kuidy-lyrics",
-  "version": "0.1.0",
-  "description": "Floating, always-on-top lyrics overlay for Spotify on Windows",
+  "version": "0.9.0-beta.1",
+  "description": "Overlay flotante y siempre-encima con las letras sincronizadas de lo que suena en Spotify, con romaji offline para japonés y traducción opcional. Solo Windows.",
   "main": "electron/main.js",
   "author": "Kuidy",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yoiberdev/kuidy-lyrics"
+  },
   "scripts": {
     "dev": "concurrently -k -n VITE,ELECTRON -c blue,magenta \"npm:dev:vite\" \"npm:dev:electron\"",
     "dev:vite": "vite",
@@ -15,21 +19,21 @@
   },
   "dependencies": {
     "dotenv": "^17.4.2",
-    "framer-motion": "^11.11.7",
     "google-translate-api-x": "^10.7.3",
     "kuroshiro": "^1.2.0",
-    "kuroshiro-analyzer-kuromoji": "^1.1.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "kuroshiro-analyzer-kuromoji": "^1.1.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.0.1",
     "cross-env": "^7.0.3",
-    "electron": "^33.0.2",
-    "electron-builder": "^25.1.7",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3",
+    "framer-motion": "^11.11.7",
     "postcss": "^8.4.47",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "tailwindcss": "^3.4.14",
     "vite": "^5.4.10",
     "wait-on": "^8.0.1"
@@ -45,12 +49,25 @@
       "dist/**/*",
       "package.json"
     ],
-    "extraResources": [
-      ".env"
-    ],
     "win": {
       "target": "nsis",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "Kuidy-Lyrics-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Kuidy Lyrics",
+      "deleteAppDataOnUninstall": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "yoiberdev",
+      "repo": "kuidy-lyrics",
+      "releaseType": "prerelease"
     }
   }
 }
