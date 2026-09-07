@@ -57,7 +57,7 @@ Es decir: cualquier instalador que repartiéramos con un Client ID nuestro dejar
 
      Tiene que ser idéntico: `127.0.0.1`, no `localhost`; `http`, no `https`; y sin barra al final. Si no coincide carácter por carácter, Spotify rechazará el inicio de sesión.
    - En **Which API/SDKs are you planning to use?** marca **Web API**.
-4. Acepta los términos y pulsa **Save**.
+4. Acepta los términos y pulsa **Create app**.
 5. Entra en la app recién creada y ve a **Settings**. Ahí verás el **Client ID**: una cadena larga de 32 letras y números. Cópiala. (El **Client Secret** NO hace falta; Kuidy usa PKCE y nunca te lo va a pedir.)
 6. Ve a **Settings → User Management** y añade **tu propio nombre y el email de tu cuenta de Spotify** a la lista de usuarios. Este paso es obligatorio: si te lo saltas, Spotify responderá `403` y Kuidy te dirá que tu cuenta no está autorizada.
 7. Abre Kuidy Lyrics, pega el Client ID donde te lo pide y conecta. Se abrirá el navegador para que autorices; después puedes cerrar esa pestaña.
