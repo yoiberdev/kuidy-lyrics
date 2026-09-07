@@ -29,11 +29,18 @@ El proceso main está dividido en módulos bajo `electron/`:
 | `config.js` | Config persistida con defaults, Client ID de usuario y tokens cifrados (safeStorage/DPAPI) |
 | `log.js` | Log a archivo en `%APPDATA%`, con tokens y Client IDs redactados |
 
-## Credenciales: un Client ID por usuario
+## Credenciales: dos escalones
 
-Kuidy **no trae credenciales de Spotify**, y no puede traerlas. Una app de Spotify en *Development Mode* admite [como máximo 5 cuentas de usuario](https://developer.spotify.com/documentation/web-api/concepts/quota-modes), y el *Extended Quota Mode* que quitaría ese límite solo se concede a organizaciones con entidad legal y 250.000 usuarios activos mensuales — desde mayo de 2025 ni siquiera se aceptan solicitudes de proyectos individuales. Un instalador con el Client ID del desarrollador se rompería con el sexto usuario.
+Una app de Spotify en *Development Mode* admite [como máximo 5 cuentas de usuario](https://developer.spotify.com/documentation/web-api/concepts/quota-modes), y el *Extended Quota Mode* que quitaría ese límite solo se concede a organizaciones con entidad legal y 250.000 usuarios activos mensuales — desde mayo de 2025 ni siquiera se aceptan solicitudes de proyectos individuales. Así que no hay un único modelo que sirva para todos, sino dos:
 
-Por eso **cada usuario crea su propia app de Spotify y pega su Client ID dentro de Kuidy**. El `.env` sigue existiendo, pero ha dejado de ser un paso obligatorio: es solo un atajo de desarrollo (y sirve para una beta cerrada de ≤5 personas con las que compartas tu app). El Client ID que el usuario pegue en la app **siempre gana** sobre el del `.env`.
+| | Para quién | Fricción | Quién necesita Premium |
+| --- | --- | --- | --- |
+| **Client ID horneado** | Las 5 plazas de tu app | Abrir y pulsar Conectar | Solo el dueño de la app |
+| **Client ID propio** | Del sexto en adelante, sin límite | ~3 min en el dashboard, una vez | Cada usuario el suyo |
+
+`scripts/bundle-client-id.js` hornea `SPOTIFY_CLIENT_ID` (del entorno o del `.env`) en `electron/bundled-client-id.js`, que entra en el asar. Se ejecuta solo con `npm run build`. Sin esa variable el build sigue siendo válido: arranca directamente en el asistente.
+
+Cuando la Web API responde 403 con el ID horneado, eso significa que la cuenta no está en las 5 plazas. No es un error transitorio, así que la app deja de reintentar y muestra el asistente para que el usuario cree la suya. El Client ID que el usuario pegue **siempre gana** sobre el horneado y sobre el del `.env`.
 
 Como Kuidy usa PKCE, el Client ID no es un secreto. **Nunca** pongas un client secret en el `.env`: la app no lo usa.
 
@@ -108,7 +115,7 @@ El instalador **no** está firmado, así que SmartScreen avisará al ejecutarlo.
 
 - **Solo Windows.** No hay build de macOS ni de Linux.
 - **Hace falta Spotify Premium**: la Web API no devuelve la reproducción a apps en Development Mode con cuentas gratuitas.
-- **Cada usuario tiene que crear su propia app de Spotify** y pegar su Client ID (ver arriba). Es una consecuencia del límite de 5 cuentas de Spotify, no una decisión de diseño.
+- **Solo 5 cuentas por app de Spotify.** A partir de ahí, cada usuario tiene que crear su propia app y pegar su Client ID (ver arriba). Es una consecuencia de las reglas de Spotify, no una decisión de diseño.
 - **La UI está solo en español.** No hay i18n todavía.
 - **El overlay no es accesible por teclado ni con lector de pantalla**: es una ventana que nunca toma el foco, que es justamente lo que le permite quedarse encima sin estorbar. Todo lo demás se controla desde el popover de la bandeja y con los atajos globales.
 - **Fullscreen exclusivo** (DirectX antiguo) puede tapar el overlay; con *borderless* funciona bien.

@@ -12,7 +12,7 @@ Esto es una beta. Funciona, pero espera fallos: por eso está el apartado [Cómo
 
 - **Windows 10 o Windows 11.** No hay versión de macOS ni de Linux.
 - **Una cuenta de Spotify Premium.** No es un capricho nuestro: la Web API de Spotify no responde a las apps en *Development Mode* si la cuenta no es Premium. Con cuenta gratuita la app se conectará pero nunca verá qué está sonando.
-- **Unos 5 minutos** para crear tu propia app en el dashboard de Spotify (paso 3). Solo se hace una vez.
+- **Nada más.** La mayoría solo tiene que abrir la app y pulsar *Conectar*. Si te toca el caso raro del paso 3, son 3 minutos y se hace una sola vez.
 
 ---
 
@@ -29,40 +29,35 @@ El instalador no está **firmado digitalmente**. Un certificado de firma de cód
 
 ---
 
-## 3. Configuración: tu propio Client ID de Spotify
+## 3. Conectar con Spotify
 
-La primera vez, Kuidy te pedirá un **Client ID**. Tienes que crear tu propia app en el dashboard de Spotify y pegarlo.
+Abre Kuidy Lyrics y pulsa **Conectar Spotify**. Se abrirá el navegador para que autorices; después puedes cerrar esa pestaña. Eso es todo.
 
-### Por qué tienes que hacer esto tú
+> **Importante**: la cuenta con la que autorizas tiene que ser **la misma** en la que está sonando la música. Si el overlay dice que no suena nada mientras tú escuchas algo, comprueba con qué cuenta está logueado tu reproductor de Spotify.
 
-Sería mucho más cómodo que la app trajera unas credenciales ya puestas, pero no es posible:
+### Si te dice que tu cuenta no cabe en esta app
 
-- Spotify permite **un máximo de 5 cuentas de usuario** en una app que esté en *Development Mode*.
-- El modo ampliado (*Extended Quota Mode*), que quitaría ese límite, **solo se concede a organizaciones con entidad legal y 250.000 usuarios activos mensuales**, y desde mayo de 2025 Spotify ya no acepta solicitudes de proyectos individuales.
+Puede pasar, y no es culpa tuya. Spotify permite **un máximo de 5 cuentas** por app en *Development Mode*, y el modo que quitaría ese límite solo se concede a organizaciones con entidad legal y 250.000 usuarios activos mensuales; desde mayo de 2025 ya no acepta solicitudes de proyectos individuales. Si las 5 plazas están ocupadas, Kuidy te lo dirá y te ofrecerá crear tu propia app, que es gratis y no compite con nadie.
 
-Es decir: cualquier instalador que repartiéramos con un Client ID nuestro dejaría de funcionar en cuanto lo probara la sexta persona. Con tu propio Client ID, tu app es tuya y no compites con nadie por esas 5 plazas.
+**Antes de empezar**: al ser tú el dueño de esa app, Spotify te exigirá tener **Premium**. Con cuenta gratuita el trámite no sirve de nada, así que compruébalo primero.
 
-### Pasos
+Los pasos, que la propia app te va guiando:
 
-1. Entra en <https://developer.spotify.com/dashboard> y accede con tu cuenta de Spotify.
-2. Pulsa **Create app**.
-3. Rellena:
-   - **App name**: `Kuidy Lyrics` (o lo que quieras).
-   - **App description**: cualquier cosa, por ejemplo `Overlay de letras`.
-   - **Redirect URI**: escribe **exactamente** esto y pulsa **Add**:
+1. Entra en <https://developer.spotify.com/dashboard> con tu cuenta de Spotify.
+2. Pulsa **Create app**. El nombre y la descripción da igual cuáles sean.
+3. En **Redirect URI** pega **exactamente** esto y pulsa **Add**:
 
-     ```
-     http://127.0.0.1:8888/callback
-     ```
+   ```
+   http://127.0.0.1:8888/callback
+   ```
 
-     Tiene que ser idéntico: `127.0.0.1`, no `localhost`; `http`, no `https`; y sin barra al final. Si no coincide carácter por carácter, Spotify rechazará el inicio de sesión.
-   - En **Which API/SDKs are you planning to use?** marca **Web API**.
-4. Acepta los términos y pulsa **Create app**.
-5. Entra en la app recién creada y ve a **Settings**. Ahí verás el **Client ID**: una cadena larga de 32 letras y números. Cópiala. (El **Client Secret** NO hace falta; Kuidy usa PKCE y nunca te lo va a pedir.)
-6. Ve a **Settings → User Management** y añade **tu propio nombre y el email de tu cuenta de Spotify** a la lista de usuarios. Este paso es obligatorio: si te lo saltas, Spotify responderá `403` y Kuidy te dirá que tu cuenta no está autorizada.
-7. Abre Kuidy Lyrics, pega el Client ID donde te lo pide y conecta. Se abrirá el navegador para que autorices; después puedes cerrar esa pestaña.
+   Tiene que ser idéntico: `127.0.0.1`, no `localhost`; `http`, no `https`; y sin barra al final. Si no coincide carácter por carácter, Spotify rechazará el login sin explicar por qué.
+4. En **Which API/SDKs are you planning to use?** marca **Web API**.
+5. Acepta los términos y pulsa **Create app**.
+6. Entra en **Settings** y copia el **Client ID**.
+7. Pégalo en Kuidy (hay botón de *Pegar*) y pulsa **Guardar**.
 
-> **Importante**: la cuenta con la que autorizas en Kuidy tiene que ser **la misma** en la que está sonando la música. Si el overlay dice que no suena nada mientras tú escuchas algo, comprueba con qué cuenta está logueado tu reproductor de Spotify.
+Si después de esto Spotify sigue devolviendo un error de autorización, ve a **Settings → User Management** y añade tu nombre y el email **de tu cuenta de Spotify**. Ojo: si creaste la cuenta con Google o Facebook, tu email habitual puede no ser ese. El cambio tarda hasta 15 minutos en propagarse.
 
 ---
 
@@ -102,7 +97,7 @@ Nada de esto es un fallo que vayas a reportar: ya lo sabemos.
 
 - **Solo Windows.** No hay build de macOS ni de Linux.
 - **Hace falta Spotify Premium.** Con cuenta gratuita la Web API no devuelve la reproducción.
-- **Tienes que crear tú la app de Spotify** y pegar tu Client ID (ver el apartado 3). No hay forma de evitarlo con las reglas actuales de Spotify.
+- **Solo caben 5 personas por app de Spotify.** Si las plazas de esta están ocupadas, tendrás que crear tu propia app (apartado 3) y entonces necesitarás Premium tú. No hay forma de evitarlo con las reglas actuales de Spotify.
 - **La interfaz está solo en español.** No hay traducción de la propia app todavía.
 - **La ventana de letras no se puede manejar con el teclado ni con un lector de pantalla.** Es una ventana que nunca coge el foco (eso es lo que le permite quedarse encima sin molestar), y el precio es que es inaccesible por teclado. Todo lo importante se puede hacer desde el panel de la bandeja y con los atajos globales.
 - **Los juegos en pantalla completa exclusiva pueden tapar el overlay.** Con *borderless fullscreen* (lo que usa casi todo lo moderno) funciona bien; con fullscreen exclusivo de DirectX antiguo, no hay nada que hacer.
