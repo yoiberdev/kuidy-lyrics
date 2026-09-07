@@ -103,19 +103,45 @@ function clearTokens() {
 
 // ---------- Client ID de Spotify ----------
 // Spotify limita cada app en Development Mode a 5 cuentas añadidas a mano, y
-// desde mayo de 2025 el modo ampliado solo se concede a empresas. Por eso la
-// app no puede repartir el Client ID del desarrollador: cada usuario crea su
-// propia app en el dashboard y pega aquí su Client ID. El .env sigue existiendo
-// como comodidad de desarrollo y como vía para una beta cerrada de <=5 cuentas.
+// desde mayo de 2025 el modo ampliado solo se concede a empresas con 250k
+// usuarios activos. De ahí el modelo en dos escalones:
+//
+//   1. El build puede llevar horneado el Client ID del desarrollador. Quien esté
+//      en sus 5 plazas solo tiene que pulsar Conectar: cero configuración. Y el
+//      único que necesita Spotify Premium es el dueño de la app.
+//   2. Quien no quepa recibe un 403, y entonces la app le ofrece crear su propia
+//      app y pegar su Client ID. Eso no tiene techo de usuarios, pero convierte
+//      a cada usuario en dueño de su app y por tanto le exige Premium a él.
+//
+// El .env queda como comodidad de desarrollo.
 const CLIENT_ID_RE = /^[0-9a-f]{32}$/i;
 
 function isValidClientId(id) {
   return CLIENT_ID_RE.test(String(id || '').trim());
 }
 
+// El Client ID que scripts/bundle-client-id.js hornea en el build. El modulo no
+// existe hasta que corre ese script, de ahi el require defensivo.
+let bundledCache;
+function getBundledClientId() {
+  if (bundledCache === undefined) {
+    try {
+      bundledCache = String(require('./bundled-client-id') || '').trim();
+    } catch {
+      bundledCache = '';
+    }
+  }
+  return bundledCache;
+}
+
+// Prioridad: lo que haya pegado el usuario gana siempre, porque si esta aqui es
+// que el horneado no le servia (no esta en la lista de 5 de esa app, o su
+// cuenta quedo bloqueada). Despues el horneado, y el .env solo en desarrollo.
 function getClientId() {
   const own = String(loadConfig().clientId || '').trim();
   if (own) return { id: own, source: 'user' };
+  const bundled = getBundledClientId();
+  if (bundled) return { id: bundled, source: 'bundled' };
   const fromEnv = String(process.env.SPOTIFY_CLIENT_ID || '').trim();
   if (fromEnv) return { id: fromEnv, source: 'env' };
   return { id: '', source: 'none' };

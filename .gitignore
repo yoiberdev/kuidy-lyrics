@@ -5,3 +5,6 @@ release
 *.log
 .env
 .env.local
+
+# Generado por scripts/bundle-client-id.js en cada build
+electron/bundled-client-id.js

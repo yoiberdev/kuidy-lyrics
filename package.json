@@ -14,8 +14,9 @@
     "dev:vite": "vite",
     "dev:electron": "wait-on http://127.0.0.1:5173 && cross-env NODE_ENV=development electron .",
     "build:renderer": "vite build",
-    "build": "npm run build:renderer && electron-builder",
-    "start": "cross-env NODE_ENV=production electron ."
+    "build": "npm run bundle:clientid && npm run build:renderer && electron-builder",
+    "start": "cross-env NODE_ENV=production electron .",
+    "bundle:clientid": "node scripts/bundle-client-id.js"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

@@ -136,7 +136,13 @@ function OverlayApp() {
   // Hasta que no llega el status no se sabe nada: pintar el setup mientras
   // tanto le enseñaba "Conecta con Spotify" a todo el mundo, ya conectado o no.
   const showLoading = !status;
-  const showSetup = !!status && (!status.hasClientId || !status.isAuthenticated);
+  // Un 403 con el Client ID horneado significa que esta cuenta no está en las 5
+  // plazas de esa app de Spotify. No es un error transitorio y no se arregla
+  // reintentando: hay que llevar al usuario a crear la suya, así que el
+  // asistente sustituye a la letra en vez de quedarse como un aviso rojo.
+  const blockedByQuota = error?.code === 'forbidden' && status?.clientIdSource !== 'user';
+  const showSetup =
+    !!status && (!status.hasClientId || !status.isAuthenticated || blockedByQuota);
   const showChrome = !minimal;
 
   return (
@@ -218,7 +224,7 @@ function OverlayApp() {
                 transition={{ duration: 0.25 }}
                 className="h-full"
               >
-                <SetupView status={status} onChange={refreshStatus} />
+                <SetupView status={status} onChange={refreshStatus} blocked={blockedByQuota ? error : null} />
               </motion.div>
             ) : (
               <motion.div

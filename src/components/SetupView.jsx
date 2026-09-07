@@ -128,7 +128,7 @@ function CopyButton({ value, label = 'Copiar', className = '' }) {
   );
 }
 
-export default function SetupView({ status, onChange }) {
+export default function SetupView({ status, onChange, blocked = null }) {
   const [authing, setAuthing] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -249,17 +249,41 @@ export default function SetupView({ status, onChange }) {
     else setLinkHint('Escribe developer.spotify.com/dashboard en tu navegador.');
   };
 
-  if (!hasClientId || editingClientId) {
+  if (!hasClientId || editingClientId || blocked) {
     return (
       <div className="no-drag h-full overflow-y-auto lyrics-scroll pr-1">
         <div className="max-w-[380px] mx-auto text-left pb-1">
-          <div className="text-[12px] font-semibold text-white/90 leading-tight">
-            Crea tu app de Spotify
-          </div>
-          <div className="text-[10px] text-white/50 leading-snug mt-0.5 mb-2.5">
-            Spotify solo permite 5 cuentas por app, así que Kuidy usa una app tuya. Es
-            gratis y son dos minutos.
-          </div>
+          {blocked ? (
+            <>
+              <div className="text-[12px] font-semibold text-rose-200 leading-tight">
+                Tu cuenta no cabe en esta app de Spotify
+              </div>
+              <div className="text-[10px] text-white/65 leading-snug mt-1 mb-1">
+                Spotify limita cada app a 5 cuentas y las de esta ya están ocupadas. No
+                es un fallo tuyo y no se arregla reintentando: con tu propia app de
+                Spotify, que es gratis, dejas de competir por esas plazas.
+              </div>
+              <div className="text-[10px] text-amber-200/80 leading-snug mb-2.5">
+                Aviso antes de empezar: al ser tú el dueño de la app, Spotify te exigirá
+                tener <strong className="font-semibold">Premium</strong>. Con cuenta
+                gratuita el trámite no servirá de nada.
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[12px] font-semibold text-white/90 leading-tight">
+                Crea tu app de Spotify
+              </div>
+              <div className="text-[10px] text-white/50 leading-snug mt-0.5 mb-1">
+                Spotify solo permite 5 cuentas por app, así que Kuidy usa una app tuya.
+                Es gratis y son dos minutos.
+              </div>
+              <div className="text-[10px] text-amber-200/80 leading-snug mb-2.5">
+                Necesitas <strong className="font-semibold">Spotify Premium</strong>:
+                serás el dueño de la app y Spotify lo exige.
+              </div>
+            </>
+          )}
 
           <div className="space-y-2.5">
             <Step n="1" title="Entra en el dashboard de Spotify y pulsa «Create app». El nombre y la descripción da igual cuáles sean.">
