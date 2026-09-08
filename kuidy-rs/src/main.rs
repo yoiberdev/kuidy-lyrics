@@ -1,10 +1,12 @@
 //! kuidy en Rust: el overlay de letras, sin navegador debajo.
 //!
-//! Segunda rebanada. La letra ya es de verdad: se pide a lrclib en otro hilo
-//! y aparece cuando llega. Lo que sigue siendo de mentira es quien suena —
-//! un reloj local en vez de Spotify — y eso entra en la siguiente.
+//! Tercera rebanada, y ya es la app: Spotify dice que suena, lrclib pone la
+//! letra y el overlay la sigue.
 //!
-//! Con `--demo` se usa una letra inventada, para verlo sin red.
+//! Al arrancar hay tres caminos. Con sesion guardada, a sondear. Sin ella,
+//! se entra en la cuenta con `--login`, que abre el navegador. Y con
+//! `--demo` no se toca la red: cancion y letra inventadas, para ver la
+//! interfaz sin cuenta.
 
 mod fetch;
 mod lrc;
@@ -12,6 +14,9 @@ mod lrclib;
 mod lyrics;
 mod overlay;
 mod playback;
+mod poller;
+mod spotify;
+mod store;
 
 use std::time::Duration;
 
@@ -19,6 +24,57 @@ use chaika::prelude::*;
 
 use overlay::Overlay;
 use playback::{Playback, Track};
+
+fn demo() -> bool {
+    std::env::args().any(|a| a == "--demo")
+}
+
+/// Arranca el sondeo con la sesion que haya, o entra en la cuenta si se
+/// pidio con `--login`.
+///
+/// Entrar bloquea hasta que el usuario termina en el navegador, asi que va
+/// en otro hilo como cualquier otra espera larga.
+fn connect(playback: Playback, visible: Signal<bool>) {
+    if let Some(tokens) = spotify::Tokens::load() {
+        log::info!("sesion de Spotify recuperada");
+        poller::start(tokens, playback, visible);
+        return;
+    }
+    if !std::env::args().any(|a| a == "--login") {
+        log::warn!("sin sesion de Spotify: arranca con --login para conectar la cuenta");
+        return;
+    }
+
+    log::info!("abriendo el navegador para entrar en Spotify");
+    chaika::task::spawn(
+        || spotify::login(spotify::CLIENT_ID, open_browser),
+        move |result| match result {
+            Ok(tokens) => {
+                tokens.save();
+                log::info!("cuenta conectada");
+                poller::start(tokens, playback, visible);
+            }
+            Err(e) => log::error!("no se pudo conectar la cuenta: {e}"),
+        },
+    );
+}
+
+/// Abre una URL en el navegador del sistema.
+fn open_browser(url: &str) {
+    let result = if cfg!(windows) {
+        // `start` es del shell, no un programa: hace falta cmd. La cadena
+        // vacia es el titulo de la ventana, que `start` se come si no.
+        std::process::Command::new("cmd").args(["/C", "start", "", url]).spawn()
+    } else if cfg!(target_os = "macos") {
+        std::process::Command::new("open").arg(url).spawn()
+    } else {
+        std::process::Command::new("xdg-open").arg(url).spawn()
+    };
+    if let Err(e) = result {
+        log::error!("no se pudo abrir el navegador: {e}");
+        log::info!("abrelo a mano: {url}");
+    }
+}
 
 fn main() -> Result<(), chaika::platform::Error> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -54,31 +110,25 @@ fn main() -> Result<(), chaika::platform::Error> {
             window.set_visible(true);
         }
 
-        let demo = std::env::args().any(|a| a == "--demo");
         let playback = Playback::new();
+        let visible = Signal::new(true);
 
-        // Sin Spotify todavia: una cancion de verdad con su reloj de mentira,
-        // que es lo que hace falta para que lrclib tenga algo que buscar.
-        let track = if demo {
-            Track {
+        let lyrics = if demo() {
+            // Sin tocar la red: cancion y letra inventadas.
+            playback.fake(Track {
                 id: "demo".into(),
                 name: "Rebanada vertical".into(),
                 artists: vec!["kuidy".into()],
                 album: String::new(),
                 duration: Duration::from_secs(52),
-            }
+            });
+            fetch::demo()
         } else {
-            Track {
-                id: "4u7EnebtmKWzUH433cf5Qv".into(),
-                name: "Bohemian Rhapsody".into(),
-                artists: vec!["Queen".into()],
-                album: "A Night at the Opera".into(),
-                duration: Duration::from_secs(354),
-            }
+            let lyrics = fetch::follow(playback.track);
+            connect(playback.clone(), visible);
+            lyrics
         };
-        playback.fake(track);
 
-        let lyrics = if demo { fetch::demo() } else { fetch::follow(playback.track) };
         Overlay { playback, lyrics }.view()
     })
 }

@@ -12,11 +12,16 @@ Los apanos que dependan de un arreglo en chaika llevan un comentario
 `// APANO(chaika#N):` para poder encontrarlos y quitarlos despues.
 
 ```sh
-cargo run                        # letra real de lrclib, reloj de mentira
-cargo run -- --demo              # todo inventado, para verlo sin red
-cargo test                       # incluye el parser de LRC y la eleccion de candidato
+cargo run -- --login             # la primera vez: abre el navegador y conecta la cuenta
+cargo run                        # despues: usa la sesion guardada
+cargo run -- --demo              # todo inventado, para verlo sin cuenta ni red
+cargo test                       # 37 tests
 cargo test -- --ignored --nocapture   # ademas, una peticion real a lrclib
 ```
+
+La sesion se guarda en `%APPDATA%\kuidy-rs\kuidy-tokens.json`, en su propia
+carpeta: compartir el archivo con el kuidy de Electron seria pedir que los
+dos refresquen a la vez y se pisen.
 
 ## Por donde va
 
@@ -24,6 +29,6 @@ cargo test -- --ignored --nocapture   # ademas, una peticion real a lrclib
 |---|---|
 | Overlay: ventana sin marco, letra siguiendo a la cancion | hecho |
 | lrclib: buscar la letra, elegir candidato, leer LRC | hecho |
-| Spotify: cuenta, que suena y por donde va | pendiente |
+| Spotify: cuenta (PKCE), que suena y por donde va | hecho |
 | Popover de ajustes, bandeja, atajos | pendiente |
 | Traduccion de subtitulos | pendiente |
