@@ -81,7 +81,12 @@ pub fn follow(track: Signal<Option<Track>>) -> Signal<State> {
                     return;
                 }
                 state.set(match result {
-                    Ok(lyrics) => State::Ready(lyrics),
+                    Ok(lyrics) => {
+                        // La letra se ensena ya; la traduccion llega despues
+                        // y nunca la retrasa.
+                        traducir(state, lyrics.clone(), mine, Rc::clone(&generation));
+                        State::Ready(lyrics)
+                    }
                     Err(e) => {
                         log::info!("sin letra: {e}");
                         State::Missing(mensaje(&e))
@@ -94,6 +99,43 @@ pub fn follow(track: Signal<Option<Track>>) -> Signal<State> {
     state
 }
 
+/// Traduce la letra en otro hilo y la mete en su sitio cuando vuelve.
+///
+/// Va aparte de la busqueda a proposito: la letra tiene que aparecer en
+/// cuanto se tiene, no cuando ademas este traducida. Y si la cancion cambia
+/// por el camino, la traduccion se tira igual que se tiraria la letra.
+fn traducir(state: Signal<State>, lyrics: Lyrics, mine: u64, generation: Rc<Cell<u64>>) {
+    // Las que ya vienen traducidas de lrclib — las bilingues — no se tocan.
+    if lyrics.lines.iter().all(|l| l.translation.is_some()) {
+        return;
+    }
+    let originales: Vec<String> = lyrics.lines.iter().map(|l| l.text.clone()).collect();
+    let idioma = crate::translate::target_language();
+    chaika::task::spawn(
+        move || crate::translate::translate_lines(&originales, &idioma),
+        move |result| {
+            if generation.get() != mine {
+                return;
+            }
+            let traducciones = match result {
+                Ok(t) => t,
+                Err(e) => {
+                    // Sin traduccion se vive; la letra ya esta puesta.
+                    log::info!("sin traduccion: {e}");
+                    return;
+                }
+            };
+            let mut lyrics = lyrics;
+            for (line, traduccion) in lyrics.lines.iter_mut().zip(traducciones) {
+                if line.translation.is_none() && !traduccion.is_empty() {
+                    line.translation = Some(traduccion);
+                }
+            }
+            state.set(State::Ready(lyrics));
+        },
+    );
+}
+
 /// Lo que se le dice al usuario. Distinto para lo definitivo y lo pasajero:
 /// "no hay letra" se acepta, "no se pudo mirar" invita a esperar.
 fn mensaje(error: &lrclib::Error) -> String {
@@ -102,11 +144,6 @@ fn mensaje(error: &lrclib::Error) -> String {
         lrclib::Error::Instrumental => "Instrumental".into(),
         lrclib::Error::Service(_) => "No se pudo consultar la letra".into(),
     }
-}
-
-/// Una letra de mentira, para ver el overlay sin red.
-pub fn demo() -> Signal<State> {
-    Signal::new(State::Ready(crate::lyrics::demo()))
 }
 
 #[cfg(test)]

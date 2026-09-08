@@ -18,6 +18,7 @@ pub struct Line {
 }
 
 impl Line {
+    #[cfg(test)]
     pub fn new(seconds: f32, text: &str) -> Self {
         Self {
             at: Duration::from_secs_f32(seconds),
@@ -58,40 +59,25 @@ impl Lyrics {
     }
 }
 
-/// Una letra de mentira para ver el overlay sin cuenta ni red.
-pub fn demo() -> Lyrics {
-    let letra = [
-        (0.0, ""),
-        (1.5, "Esto es kuidy, en Rust"),
-        (5.0, "sin navegador por debajo"),
-        (8.5, "la letra la pinta la GPU"),
-        (12.0, ""),
-        (13.5, "cada linea llega a su hora"),
-        (17.0, "y la lista se mueve sola"),
-        (20.5, "para dejarla en el centro"),
-        (24.0, ""),
-        (25.5, "si algo se rompe por el camino"),
-        (29.0, "no se arregla: se anota"),
-        (32.5, "y el port sigue adelante"),
-        (36.0, ""),
-        (37.5, "porque la lista de lo que falla"),
-        (41.0, "es el producto de este viaje"),
-        (44.5, "tanto como la app"),
-        (48.0, ""),
-    ];
-    Lyrics {
-        lines: letra.iter().map(|(t, s)| Line::new(*t, s)).collect(),
-        synced: true,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn letra_de_prueba() -> Lyrics {
+        Lyrics {
+            lines: vec![
+                Line::new(0.0, ""),
+                Line::new(1.5, "primera"),
+                Line::new(5.0, "segunda"),
+                Line::new(8.5, "tercera"),
+            ],
+            synced: true,
+        }
+    }
+
     #[test]
     fn la_linea_actual_es_la_ultima_que_ya_empezo() {
-        let letra = demo();
+        let letra = letra_de_prueba();
         assert_eq!(letra.line_at(Duration::ZERO), Some(0));
         assert_eq!(letra.line_at(Duration::from_secs_f32(1.4)), Some(0));
         assert_eq!(letra.line_at(Duration::from_secs_f32(1.6)), Some(1));

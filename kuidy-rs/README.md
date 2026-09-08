@@ -14,7 +14,7 @@ Los apanos que dependan de un arreglo en chaika llevan un comentario
 ```sh
 cargo run -- --login             # la primera vez: abre el navegador y conecta la cuenta
 cargo run                        # despues: usa la sesion guardada
-cargo run -- --demo              # todo inventado, para verlo sin cuenta ni red
+cargo run -- --demo              # sin cuenta: cancion fija, letra y traduccion de verdad
 
 Ctrl+Alt+H muestra u oculta las letras; Ctrl+Alt+J abre los ajustes. El icono
 de la bandeja hace lo mismo, y ahi esta tambien Salir.
@@ -34,4 +34,5 @@ dos refresquen a la vez y se pisen.
 | lrclib: buscar la letra, elegir candidato, leer LRC | hecho |
 | Spotify: cuenta (PKCE), que suena y por donde va | hecho |
 | Ajustes que se guardan, popover, bandeja y atajos | hecho |
-| Traduccion propia de subtitulos (Google) | pendiente |
+| Traduccion de las lineas (Google, no oficial) | hecho |
+| Romaji para japones | pendiente: el diccionario pesa 50 MB y el binario 11 |
