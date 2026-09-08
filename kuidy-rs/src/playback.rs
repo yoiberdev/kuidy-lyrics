@@ -14,6 +14,8 @@ pub struct Track {
     pub id: String,
     pub name: String,
     pub artists: Vec<String>,
+    /// El album, que lrclib usa para afinar la busqueda.
+    pub album: String,
     /// Cuanto dura, para saber cuando se acaba.
     pub duration: Duration,
 }
@@ -92,6 +94,7 @@ mod tests {
             id: "1".into(),
             name: "x".into(),
             artists: vec!["Ana".into(), "Beto".into()],
+            album: "y".into(),
             duration: Duration::from_secs(1),
         };
         assert_eq!(t.artists_line(), "Ana, Beto");

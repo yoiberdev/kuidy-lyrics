@@ -1,11 +1,14 @@
 //! kuidy en Rust: el overlay de letras, sin navegador debajo.
 //!
-//! Esta es la primera rebanada del port. Todavia no habla con Spotify ni con
-//! lrclib: la cancion y la letra son de mentira, y avanzan solas. Lo que si
-//! es de verdad es todo lo demas — la ventana sin marco sobre el escritorio,
-//! el seguimiento de la linea que suena y el desplazamiento que la deja en
-//! el centro.
+//! Segunda rebanada. La letra ya es de verdad: se pide a lrclib en otro hilo
+//! y aparece cuando llega. Lo que sigue siendo de mentira es quien suena —
+//! un reloj local en vez de Spotify — y eso entra en la siguiente.
+//!
+//! Con `--demo` se usa una letra inventada, para verlo sin red.
 
+mod fetch;
+mod lrc;
+mod lrclib;
 mod lyrics;
 mod overlay;
 mod playback;
@@ -51,14 +54,31 @@ fn main() -> Result<(), chaika::platform::Error> {
             window.set_visible(true);
         }
 
+        let demo = std::env::args().any(|a| a == "--demo");
         let playback = Playback::new();
-        playback.fake(Track {
-            id: "demo".into(),
-            name: "Rebanada vertical".into(),
-            artists: vec!["kuidy".into(), "chaika".into()],
-            duration: Duration::from_secs(52),
-        });
 
-        Overlay { playback, lyrics: Signal::new(lyrics::demo()) }.view()
+        // Sin Spotify todavia: una cancion de verdad con su reloj de mentira,
+        // que es lo que hace falta para que lrclib tenga algo que buscar.
+        let track = if demo {
+            Track {
+                id: "demo".into(),
+                name: "Rebanada vertical".into(),
+                artists: vec!["kuidy".into()],
+                album: String::new(),
+                duration: Duration::from_secs(52),
+            }
+        } else {
+            Track {
+                id: "4u7EnebtmKWzUH433cf5Qv".into(),
+                name: "Bohemian Rhapsody".into(),
+                artists: vec!["Queen".into()],
+                album: "A Night at the Opera".into(),
+                duration: Duration::from_secs(354),
+            }
+        };
+        playback.fake(track);
+
+        let lyrics = if demo { fetch::demo() } else { fetch::follow(playback.track) };
+        Overlay { playback, lyrics }.view()
     })
 }

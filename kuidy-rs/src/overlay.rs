@@ -6,7 +6,7 @@
 
 use chaika::prelude::*;
 
-use crate::lyrics::Lyrics;
+use crate::fetch::State;
 use crate::playback::Playback;
 
 const FONDO: Color = Color::rgba8(10, 10, 14, 200);
@@ -17,7 +17,7 @@ const DESVANECIDO: f32 = 0.22;
 
 pub struct Overlay {
     pub playback: Playback,
-    pub lyrics: Signal<Lyrics>,
+    pub lyrics: Signal<State>,
 }
 
 impl Overlay {
@@ -28,7 +28,12 @@ impl Overlay {
 
         // Que linea suena, como senal derivada: la lista y la cabecera la
         // leen, y solo se repinta cuando cambia de verdad.
-        let actual = Memo::new(move || lyrics.with(|l| l.line_at(position.get())));
+        let actual = Memo::new(move || {
+            lyrics.with(|s| s.lyrics().and_then(|l| l.line_at(position.get())))
+        });
+        // Cuantas lineas hay que pintar, y si hay algo que decir en su lugar.
+        let cuantas = Memo::new(move || lyrics.with(|s| s.lyrics().map_or(0, |l| l.lines.len())));
+        let aviso = Memo::new(move || lyrics.with(|s| s.message().to_string()));
 
         let lista = ScrollHandle::new();
         let seguir = lista.clone();
@@ -65,10 +70,32 @@ impl Overlay {
                     .px(px(16.))
                     .py(px(60.))
                     .gap(px(10.))
+                    // APANO(chaika#4): una sola fuente de hijos. Llamar dos
+                    // veces a `children_for` no anade: la segunda pisa a la
+                    // primera sin avisar, y la lista se queda vacia.
                     .children_for(
-                        move || lyrics.with(|l| (0..l.lines.len()).collect::<Vec<_>>()),
-                        |i: &usize| *i,
-                        move |i| linea(*i, lyrics, actual),
+                        move || match cuantas.get() {
+                            0 => vec![Fila::Aviso(aviso.get())],
+                            n => (0..n).map(Fila::Linea).collect(),
+                        },
+                        Fila::clave,
+                        move |fila| match fila {
+                            Fila::Linea(i) => linea(*i, lyrics, actual),
+                            // El aviso ocupa el hueco y se centra el solo.
+                            // Centrar el contenedor entero (`justify_center`)
+                            // dejaria las primeras lineas por encima del
+                            // borde, donde el scroll no llega. Ver chaika#5.
+                            Fila::Aviso(m) => div()
+                                .flex_1()
+                                .w_full()
+                                .items_center()
+                                .justify_center()
+                                .child(
+                                    text(m.clone())
+                                        .text_size(px(13.))
+                                        .color(Color::rgba8(255, 255, 255, 150)),
+                                ),
+                        },
                     ),
             )
             // Los bordes se desvanecen para que las lineas no aparezcan
@@ -136,9 +163,26 @@ fn cabecera(playback: &Playback) -> Element {
         )
 }
 
+/// Lo que ocupa el cuerpo del overlay: las lineas de la letra, o el motivo
+/// por el que no hay ninguna.
+#[derive(Clone, Debug)]
+enum Fila {
+    Linea(usize),
+    Aviso(String),
+}
+
+impl Fila {
+    fn clave(&self) -> String {
+        match self {
+            Fila::Linea(i) => format!("l{i}"),
+            Fila::Aviso(m) => format!("a{m}"),
+        }
+    }
+}
+
 /// Una linea de la letra. Se apaga y encoge segun lo lejos que este de la
 /// que suena.
-fn linea(index: usize, lyrics: Signal<Lyrics>, actual: Memo<Option<usize>>) -> Element {
+fn linea(index: usize, lyrics: Signal<State>, actual: Memo<Option<usize>>) -> Element {
     let es_actual = move || actual.get() == Some(index);
     let distancia = move || match actual.get() {
         Some(a) => a.abs_diff(index),
@@ -146,7 +190,11 @@ fn linea(index: usize, lyrics: Signal<Lyrics>, actual: Memo<Option<usize>>) -> E
     };
 
     text(derive(move || {
-        lyrics.with(|l| l.lines.get(index).map_or(String::new(), |x| x.shown().to_string()))
+        lyrics.with(|s| {
+            s.lyrics()
+                .and_then(|l| l.lines.get(index))
+                .map_or(String::new(), |x| x.shown().to_string())
+        })
     }))
     .text_size(derive(move || if es_actual() { px(19.) } else { px(14.) }))
     .weight(derive(move || {
