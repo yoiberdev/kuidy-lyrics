@@ -37,5 +37,17 @@ dos refresquen a la vez y se pisen.
 | Ajustes que se guardan, popover, bandeja y atajos | hecho |
 | Traduccion de las lineas (Google, no oficial) | hecho |
 | Log a disco, con secretos tapados | hecho |
-| Romaji para japones | pendiente: el diccionario pesa 50 MB y el binario 11 |
+| Romaji para japones | hecho, sin diccionario |
 | Icono propio (hoy es un vinilo dibujado a mano) | pendiente |
+
+En japones se ensena la lectura y no la traduccion: la letra se canta, y sin
+romaji no hay por donde entrarle. Sale del mismo endpoint de Google que ya se
+usa para traducir (`dt=rm`), asi que **no cuesta ni un byte de binario**. El
+kuidy de Electron lo sacaba de kuroshiro con un diccionario de 17 MB, y las
+alternativas en Rust piden entre 1,7 y 50 MB para un binario que pesa 11.
+
+El trato: Google acierta las lecturas pero a veces pega las palabras
+(`Kiminonaha` donde tocaria `kimi no na wa`) y se equivoca con los kanji
+sueltos (`日` lo lee `Ni~Tsu` en vez de `hi`). Para cantar encima sirve; para
+estudiar japones, no. La otra cara es que necesita red: sin conexion no hay
+romaji, igual que no hay letra.

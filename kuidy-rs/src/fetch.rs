@@ -110,9 +110,21 @@ fn traducir(state: Signal<State>, lyrics: Lyrics, mine: u64, generation: Rc<Cell
         return;
     }
     let originales: Vec<String> = lyrics.lines.iter().map(|l| l.text.clone()).collect();
+    // En japones se ensena la lectura y no la traduccion, que es lo que pide
+    // el caso: la letra se canta, y sin romaji no hay por donde entrarle.
+    // Basta con que unas cuantas lineas lleven kana; una cancion japonesa
+    // tiene versos sueltos en ingles.
+    let japones = originales.iter().filter(|l| crate::translate::is_japanese(l)).count();
+    let en_japones = japones * 4 >= originales.iter().filter(|l| !l.trim().is_empty()).count();
     let idioma = crate::translate::target_language();
     chaika::task::spawn(
-        move || crate::translate::translate_lines(&originales, &idioma),
+        move || {
+            if en_japones {
+                crate::translate::romanize(&originales)
+            } else {
+                crate::translate::translate_lines(&originales, &idioma)
+            }
+        },
         move |result| {
             if generation.get() != mine {
                 return;
