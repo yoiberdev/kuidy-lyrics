@@ -60,17 +60,15 @@ fn connect(playback: Playback, visible: Signal<bool>) {
 }
 
 /// Abre una URL en el navegador del sistema.
+///
+/// APANO(chaika#6): esto deberia darlo el toolkit. Hacerlo a mano en Windows
+/// tiene dos trampas que costaron una sesion: `cmd /C start` trata el `&`
+/// como separador de comandos — la URL de Spotify llega cortada en el primer
+/// parametro — y ademas expande los `%` de una URL ya codificada. Se usa el
+/// crate `open`, que por dentro llama a `ShellExecuteW` y no pasa por cmd.
 fn open_browser(url: &str) {
-    let result = if cfg!(windows) {
-        // `start` es del shell, no un programa: hace falta cmd. La cadena
-        // vacia es el titulo de la ventana, que `start` se come si no.
-        std::process::Command::new("cmd").args(["/C", "start", "", url]).spawn()
-    } else if cfg!(target_os = "macos") {
-        std::process::Command::new("open").arg(url).spawn()
-    } else {
-        std::process::Command::new("xdg-open").arg(url).spawn()
-    };
-    if let Err(e) = result {
+    log::debug!("abriendo {url}");
+    if let Err(e) = open::that_detached(url) {
         log::error!("no se pudo abrir el navegador: {e}");
         log::info!("abrelo a mano: {url}");
     }

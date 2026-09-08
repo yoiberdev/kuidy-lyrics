@@ -16,6 +16,9 @@ serde_json = "1"
 # PKCE: SHA-256 para el desafio y aleatoriedad para el verificador.
 sha2 = "0.10"
 rand = "0.9"
+# Abrir el navegador. Parece que sobra hasta que ves que `cmd /C start` se
+# come todo lo que va tras un `&` y expande los `%` de una URL codificada.
+open = "5"
 env_logger = "0.11"
 
 [profile.release]
