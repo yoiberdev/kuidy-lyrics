@@ -24,14 +24,38 @@ pub fn parse(text: &str) -> Vec<Line> {
         if stamps.is_empty() {
             continue;
         }
-        let text = rest.trim();
+        let (text, translation) = split_bilingual(rest.trim());
         for at in stamps {
-            lines.push(Line { at, text: text.to_string(), translation: None });
+            lines.push(Line {
+                at,
+                text: text.to_string(),
+                translation: translation.map(str::to_string),
+            });
         }
     }
     // Las marcas multiples y los LRC mal ordenados dejan la lista revuelta.
     lines.sort_by_key(|l| l.at);
     lines
+}
+
+/// Algunos registros de lrclib traen la linea y su traduccion en el mismo
+/// renglon, separadas por `^`. Sin partirlas se lee un churro:
+/// "Tomate algo, vamos a perrear^Have a drink, let's dance".
+///
+/// Solo se parte por el primero y solo si las dos mitades tienen algo: un
+/// `^` suelto en una letra es raro, pero mas raro es tirar media linea.
+fn split_bilingual(text: &str) -> (&str, Option<&str>) {
+    match text.split_once('^') {
+        Some((original, translation)) => {
+            let (original, translation) = (original.trim_end(), translation.trim_start());
+            if original.is_empty() || translation.is_empty() {
+                (text, None)
+            } else {
+                (original, Some(translation))
+            }
+        }
+        None => (text, None),
+    }
 }
 
 /// Una letra completa a partir de su LRC, o `None` si no habia ni una marca.
@@ -138,6 +162,25 @@ mod tests {
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0].text, "esta si");
         assert_eq!(lines[1].text, "y esta tambien");
+    }
+
+    #[test]
+    fn las_lineas_bilingues_se_parten_en_dos() {
+        let lines = parse("[00:05.00] Tomate algo, vamos a perrear^Have a drink, let's dance");
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].text, "Tomate algo, vamos a perrear");
+        assert_eq!(lines[0].translation.as_deref(), Some("Have a drink, let's dance"));
+    }
+
+    #[test]
+    fn un_acento_circunflejo_suelto_no_parte_la_linea() {
+        // Sin nada a un lado, no es un separador: es parte del verso.
+        let lines = parse("[00:05.00] solo esto ^
+[00:06.00] ^ y esto");
+        assert_eq!(lines[0].text, "solo esto ^");
+        assert!(lines[0].translation.is_none());
+        assert_eq!(lines[1].text, "^ y esto");
+        assert!(lines[1].translation.is_none());
     }
 
     #[test]

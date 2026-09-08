@@ -189,25 +189,34 @@ fn linea(index: usize, lyrics: Signal<State>, actual: Memo<Option<usize>>) -> El
         None => index,
     };
 
-    text(derive(move || {
-        lyrics.with(|s| {
-            s.lyrics()
-                .and_then(|l| l.lines.get(index))
-                .map_or(String::new(), |x| x.shown().to_string())
+    let opacidad = move || {
+        if es_actual() { 1.0 } else { (0.7 - distancia() as f32 * DESVANECIDO).max(0.12) }
+    };
+    let con = move |f: fn(&crate::lyrics::Line) -> String| {
+        derive(move || {
+            lyrics.with(|s| s.lyrics().and_then(|l| l.lines.get(index)).map_or(String::new(), &f))
         })
-    }))
-    .text_size(derive(move || if es_actual() { px(19.) } else { px(14.) }))
-    .weight(derive(move || {
-        if es_actual() { FontWeight::BOLD } else { FontWeight::NORMAL }
-    }))
-    .color(derive(move || {
-        if es_actual() {
-            Color::WHITE
-        } else {
-            let alpha = (0.7 - distancia() as f32 * DESVANECIDO).max(0.12);
-            Color::rgba(1.0, 1.0, 1.0, alpha)
-        }
-    }))
-    .flex_none()
+    };
+
+    div()
+        .flex_col()
+        .items_center()
+        .flex_none()
+        .w_full()
+        .child(
+            text(con(|l| l.shown().to_string()))
+                .text_size(derive(move || if es_actual() { px(19.) } else { px(14.) }))
+                .weight(derive(move || {
+                    if es_actual() { FontWeight::BOLD } else { FontWeight::NORMAL }
+                }))
+                .color(derive(move || Color::rgba(1.0, 1.0, 1.0, opacidad()))),
+        )
+        // La traduccion, cuando la letra la trae: mas pequena y mas apagada,
+        // para que se lea sin competir con el original.
+        .child(
+            text(con(|l| l.translation.clone().unwrap_or_default()))
+                .text_size(derive(move || if es_actual() { px(13.) } else { px(11.) }))
+                .color(derive(move || Color::rgba(1.0, 1.0, 1.0, opacidad() * 0.6))),
+        )
 }
 
