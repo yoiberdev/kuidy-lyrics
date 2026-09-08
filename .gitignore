@@ -8,3 +8,6 @@ release
 
 # Generado por scripts/bundle-client-id.js en cada build
 electron/bundled-client-id.js
+
+# El port en Rust
+kuidy-rs/target/
