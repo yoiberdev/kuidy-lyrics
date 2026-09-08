@@ -150,8 +150,31 @@ fn recordar_posicion(prefs: Prefs) {
     vigilar(prefs, None);
 }
 
-fn demo() -> bool {
-    std::env::args().any(|a| a == "--demo")
+/// La cancion de mentira con la que arrancar sin cuenta de Spotify.
+///
+/// `--demo` sola pone una conocida; `--demo "YOASOBI - Yoru ni Kakeru"`
+/// pone la que se pida, que es la unica forma de ver la letra de otro
+/// idioma sin tener esa cancion sonando de verdad.
+fn demo() -> Option<Track> {
+    let mut args = std::env::args().skip_while(|a| a != "--demo");
+    args.next()?;
+    // Lo que venga detras, si no es otra opcion.
+    let pedida = args.next().filter(|a| !a.starts_with("--"));
+    let (artist, name, duration) = match pedida.as_deref() {
+        Some(texto) => match texto.split_once(" - ") {
+            Some((artista, titulo)) => (artista.trim(), titulo.trim(), 240),
+            // Sin guion, todo es el titulo: lrclib busca igual.
+            None => ("", texto.trim(), 240),
+        },
+        None => ("Queen", "Bohemian Rhapsody", 354),
+    };
+    Some(Track {
+        id: "demo".into(),
+        name: name.into(),
+        artists: if artist.is_empty() { Vec::new() } else { vec![artist.into()] },
+        album: String::new(),
+        duration: Duration::from_secs(duration),
+    })
 }
 
 /// Arranca el sondeo con la sesion que haya, o entra en la cuenta si se
@@ -262,18 +285,13 @@ fn main() -> Result<(), chaika::platform::Error> {
             }
         });
 
-        let lyrics = if demo() {
-            // Sin cuenta de Spotify, pero con todo lo demas de verdad: una
-            // cancion conocida con su reloj local, y la letra y la
-            // traduccion pedidas como siempre. Sirve para ver la app sin
-            // conectar nada y para probar la tuberia entera.
-            playback.fake(Track {
-                id: "demo".into(),
-                name: "Bohemian Rhapsody".into(),
-                artists: vec!["Queen".into()],
-                album: "A Night at the Opera".into(),
-                duration: Duration::from_secs(354),
-            });
+        let lyrics = if let Some(track) = demo() {
+            // Sin cuenta de Spotify, pero con todo lo demas de verdad: la
+            // cancion con su reloj local, y la letra y la traduccion pedidas
+            // como siempre. Sirve para ver la app sin conectar nada y para
+            // probar la tuberia entera.
+            log::info!("demo: {} - {}", track.artists.join(", "), track.name);
+            playback.fake(track);
             fetch::follow(playback.track)
         } else {
             let lyrics = fetch::follow(playback.track);

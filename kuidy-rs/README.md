@@ -15,6 +15,7 @@ Los apanos que dependan de un arreglo en chaika llevan un comentario
 cargo run -- --login             # la primera vez: abre el navegador y conecta la cuenta
 cargo run                        # despues: usa la sesion guardada
 cargo run -- --demo              # sin cuenta: cancion fija, letra y traduccion de verdad
+cargo run -- --demo "YOASOBI - Yoru ni Kakeru"   # la cancion que se pida (para ver el romaji)
 
 Ctrl+Alt+H muestra u oculta las letras; Ctrl+Alt+J abre los ajustes. El icono
 de la bandeja hace lo mismo, y ahi esta tambien Salir.
