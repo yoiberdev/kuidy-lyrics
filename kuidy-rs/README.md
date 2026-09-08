@@ -17,11 +17,12 @@ cargo run                        # despues: usa la sesion guardada
 cargo run -- --demo              # sin cuenta: cancion fija, letra y traduccion de verdad
 cargo run -- --demo "YOASOBI - Yoru ni Kakeru"   # la cancion que se pida (para ver el romaji)
 
+cargo test                       # 59 tests, sin tocar la red
+cargo test -- --ignored --nocapture   # ademas, 4 peticiones de verdad a lrclib y a Google
+```
+
 Ctrl+Alt+H muestra u oculta las letras; Ctrl+Alt+J abre los ajustes. El icono
 de la bandeja hace lo mismo, y ahi esta tambien Salir.
-cargo test                       # 37 tests
-cargo test -- --ignored --nocapture   # ademas, una peticion real a lrclib
-```
 
 El log va a `%APPDATA%\kuidy-rs\logs\main.log` y se abre desde el menu de la
 bandeja. La sesion se guarda en `%APPDATA%\kuidy-rs\kuidy-tokens.json`, en su
