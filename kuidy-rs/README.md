@@ -22,8 +22,9 @@ cargo test                       # 37 tests
 cargo test -- --ignored --nocapture   # ademas, una peticion real a lrclib
 ```
 
-La sesion se guarda en `%APPDATA%\kuidy-rs\kuidy-tokens.json`, en su propia
-carpeta: compartir el archivo con el kuidy de Electron seria pedir que los
+El log va a `%APPDATA%\kuidy-rs\logs\main.log` y se abre desde el menu de la
+bandeja. La sesion se guarda en `%APPDATA%\kuidy-rs\kuidy-tokens.json`, en su
+propia carpeta: compartir el archivo con el kuidy de Electron seria pedir que los
 dos refresquen a la vez y se pisen.
 
 ## Por donde va
@@ -35,4 +36,6 @@ dos refresquen a la vez y se pisen.
 | Spotify: cuenta (PKCE), que suena y por donde va | hecho |
 | Ajustes que se guardan, popover, bandeja y atajos | hecho |
 | Traduccion de las lineas (Google, no oficial) | hecho |
+| Log a disco, con secretos tapados | hecho |
 | Romaji para japones | pendiente: el diccionario pesa 50 MB y el binario 11 |
+| Icono propio (hoy es un vinilo dibujado a mano) | pendiente |

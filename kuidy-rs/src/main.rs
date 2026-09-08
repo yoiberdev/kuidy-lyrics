@@ -9,6 +9,7 @@
 //! interfaz sin cuenta.
 
 mod fetch;
+mod log_file;
 mod lrc;
 mod lrclib;
 mod lyrics;
@@ -52,6 +53,10 @@ fn menu_bandeja(visible: bool) -> Vec<MenuEntry> {
         MenuEntry::item("toggle", if visible { "Ocultar letras" } else { "Mostrar letras" }),
         MenuEntry::item("ajustes", "Ajustes..."),
         MenuEntry::separator(),
+        // Quien reporte un fallo tiene que poder mandar el log sin ir a
+        // buscar %APPDATA% a mano.
+        MenuEntry::item("logs", "Abrir carpeta de logs"),
+        MenuEntry::separator(),
         MenuEntry::item("version", concat!("kuidy v", env!("CARGO_PKG_VERSION"))).disabled(),
         MenuEntry::item("salir", "Salir"),
     ]
@@ -84,6 +89,15 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
     app::on_menu(move |id| match id {
         "toggle" => alternar(),
         "ajustes" => settings::open(prefs, ajustes),
+        "logs" => match log_file::dir() {
+            Some(dir) => {
+                log::info!("abriendo la carpeta de logs: {}", dir.display());
+                if let Err(e) = open::that_detached(&dir) {
+                    log::warn!("no se pudo abrir la carpeta de logs: {e}");
+                }
+            }
+            None => log::warn!("no hay carpeta de logs que abrir"),
+        },
         "salir" => app::close(WindowToken::MAIN),
         _ => {}
     });
@@ -186,7 +200,14 @@ fn open_browser(url: &str) {
 }
 
 fn main() -> Result<(), chaika::platform::Error> {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    // A la terminal y al archivo: cuando alguien reporte un fallo, el
+    // archivo es lo unico que hay.
+    log_file::init();
+    log::info!(
+        "kuidy {} arrancando ({})",
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::OS
+    );
 
     let options = AppOptions {
         window: WindowOptions {
