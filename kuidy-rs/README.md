@@ -15,6 +15,9 @@ Los apanos que dependan de un arreglo en chaika llevan un comentario
 cargo run -- --login             # la primera vez: abre el navegador y conecta la cuenta
 cargo run                        # despues: usa la sesion guardada
 cargo run -- --demo              # todo inventado, para verlo sin cuenta ni red
+
+Ctrl+Alt+H muestra u oculta las letras; Ctrl+Alt+J abre los ajustes. El icono
+de la bandeja hace lo mismo, y ahi esta tambien Salir.
 cargo test                       # 37 tests
 cargo test -- --ignored --nocapture   # ademas, una peticion real a lrclib
 ```
@@ -30,5 +33,5 @@ dos refresquen a la vez y se pisen.
 | Overlay: ventana sin marco, letra siguiendo a la cancion | hecho |
 | lrclib: buscar la letra, elegir candidato, leer LRC | hecho |
 | Spotify: cuenta (PKCE), que suena y por donde va | hecho |
-| Popover de ajustes, bandeja, atajos | pendiente |
-| Traduccion de subtitulos | pendiente |
+| Ajustes que se guardan, popover, bandeja y atajos | hecho |
+| Traduccion propia de subtitulos (Google) | pendiente |

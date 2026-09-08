@@ -8,6 +8,7 @@ use chaika::prelude::*;
 
 use crate::fetch::State;
 use crate::playback::Playback;
+use crate::prefs::Prefs;
 
 const FONDO: Color = Color::rgba8(10, 10, 14, 200);
 
@@ -18,12 +19,13 @@ const DESVANECIDO: f32 = 0.22;
 pub struct Overlay {
     pub playback: Playback,
     pub lyrics: Signal<State>,
+    pub prefs: Prefs,
 }
 
 impl Overlay {
     pub fn view(&self) -> Element {
-        let Overlay { playback, lyrics } = self;
-        let (playback, lyrics) = (playback.clone(), *lyrics);
+        let Overlay { playback, lyrics, prefs } = self;
+        let (playback, lyrics, prefs) = (playback.clone(), *lyrics, *prefs);
         let position = playback.position;
 
         // Que linea suena, como senal derivada: la lista y la cabecera la
@@ -47,7 +49,9 @@ impl Overlay {
             .size_full()
             .flex_col()
             .rounded(px(14.))
-            .bg(FONDO)
+            // La opacidad del ajuste se aplica al fondo, no a todo: el texto
+            // tiene que seguir leyendose sobre cualquier escritorio.
+            .bg(derive(move || FONDO.with_alpha(FONDO.a * prefs.opacity.get())))
             .family("Segoe UI, sans-serif")
             // Sin barra de titulo: se arrastra por donde sea.
             .drag_window()
@@ -80,7 +84,7 @@ impl Overlay {
                         },
                         Fila::clave,
                         move |fila| match fila {
-                            Fila::Linea(i) => linea(*i, lyrics, actual),
+                            Fila::Linea(i) => linea(*i, lyrics, actual, prefs),
                             // El aviso ocupa el hueco y se centra el solo.
                             // Centrar el contenedor entero (`justify_center`)
                             // dejaria las primeras lineas por encima del
@@ -182,7 +186,12 @@ impl Fila {
 
 /// Una linea de la letra. Se apaga y encoge segun lo lejos que este de la
 /// que suena.
-fn linea(index: usize, lyrics: Signal<State>, actual: Memo<Option<usize>>) -> Element {
+fn linea(
+    index: usize,
+    lyrics: Signal<State>,
+    actual: Memo<Option<usize>>,
+    prefs: Prefs,
+) -> Element {
     let es_actual = move || actual.get() == Some(index);
     let distancia = move || match actual.get() {
         Some(a) => a.abs_diff(index),
@@ -205,7 +214,10 @@ fn linea(index: usize, lyrics: Signal<State>, actual: Memo<Option<usize>>) -> El
         .w_full()
         .child(
             text(con(|l| l.shown().to_string()))
-                .text_size(derive(move || if es_actual() { px(19.) } else { px(14.) }))
+                .text_size(derive(move || {
+                    let base = if es_actual() { 19. } else { 14. };
+                    px(base * prefs.font_scale.get())
+                }))
                 .weight(derive(move || {
                     if es_actual() { FontWeight::BOLD } else { FontWeight::NORMAL }
                 }))
@@ -214,9 +226,23 @@ fn linea(index: usize, lyrics: Signal<State>, actual: Memo<Option<usize>>) -> El
         // La traduccion, cuando la letra la trae: mas pequena y mas apagada,
         // para que se lea sin competir con el original.
         .child(
-            text(con(|l| l.translation.clone().unwrap_or_default()))
-                .text_size(derive(move || if es_actual() { px(13.) } else { px(11.) }))
-                .color(derive(move || Color::rgba(1.0, 1.0, 1.0, opacidad() * 0.6))),
+            text(derive(move || {
+                if prefs.show_subs.get() {
+                    lyrics.with(|s| {
+                        s.lyrics()
+                            .and_then(|l| l.lines.get(index))
+                            .and_then(|l| l.translation.clone())
+                            .unwrap_or_default()
+                    })
+                } else {
+                    String::new()
+                }
+            }))
+            .text_size(derive(move || {
+                let base = if es_actual() { 13. } else { 11. };
+                px(base * prefs.font_scale.get())
+            }))
+            .color(derive(move || Color::rgba(1.0, 1.0, 1.0, opacidad() * 0.6))),
         )
 }
 

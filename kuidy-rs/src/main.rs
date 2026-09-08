@@ -15,6 +15,8 @@ mod lyrics;
 mod overlay;
 mod playback;
 mod poller;
+mod prefs;
+mod settings;
 mod spotify;
 mod store;
 
@@ -24,6 +26,114 @@ use chaika::prelude::*;
 
 use overlay::Overlay;
 use playback::{Playback, Track};
+use prefs::Prefs;
+
+/// El icono de la bandeja: un disco con el azul de kuidy.
+fn tray_icon() -> Icon {
+    let n = 32_u32;
+    let mut rgba = Vec::with_capacity((n * n * 4) as usize);
+    for y in 0..n {
+        for x in 0..n {
+            let (dx, dy) = (x as f32 - 15.5, y as f32 - 15.5);
+            let d = (dx * dx + dy * dy).sqrt();
+            // Un disco con un agujero: un vinilo, que es lo que suena.
+            let fuera = (15.0 - d).clamp(0.0, 1.0);
+            let dentro = (d - 4.0).clamp(0.0, 1.0);
+            let alpha = fuera * dentro;
+            rgba.extend([0x5b, 0x8c, 0xff, (alpha * 255.0) as u8]);
+        }
+    }
+    Icon { width: n, height: n, rgba }
+}
+
+fn menu_bandeja(visible: bool) -> Vec<MenuEntry> {
+    vec![
+        MenuEntry::item("toggle", if visible { "Ocultar letras" } else { "Mostrar letras" }),
+        MenuEntry::item("ajustes", "Ajustes..."),
+        MenuEntry::separator(),
+        MenuEntry::item("version", concat!("kuidy v", env!("CARGO_PKG_VERSION"))).disabled(),
+        MenuEntry::item("salir", "Salir"),
+    ]
+}
+
+/// La bandeja y los atajos: lo que hace que la app viva en segundo plano.
+///
+/// El overlay no tiene barra de titulo ni aparece en la barra de tareas, asi
+/// que sin esto no habria forma de recuperarlo una vez oculto.
+fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
+    let ajustes: Signal<Option<WindowToken>> = Signal::new(None);
+
+    let alternar = move || {
+        let ahora = !visible.get_untracked();
+        visible.set(ahora);
+        if let Some(w) = app::window(WindowToken::MAIN) {
+            w.set_visible(ahora);
+        }
+        app::with_tray(|t| t.set_menu(&menu_bandeja(ahora)));
+    };
+
+    if let Err(e) = app::tray(TrayOptions {
+        icon: tray_icon(),
+        tooltip: concat!("kuidy v", env!("CARGO_PKG_VERSION")).into(),
+        menu: menu_bandeja(true),
+    }) {
+        log::error!("sin icono en la bandeja: {e}");
+    }
+
+    app::on_menu(move |id| match id {
+        "toggle" => alternar(),
+        "ajustes" => settings::open(prefs, ajustes),
+        "salir" => app::close(WindowToken::MAIN),
+        _ => {}
+    });
+    // Clic izquierdo en el icono: mostrar u ocultar, como el kuidy de siempre.
+    app::on_tray(move |ev| {
+        if let TrayEvent::Click { button: MouseButton::Left, .. } = ev {
+            alternar();
+        }
+    });
+
+    // Los mismos atajos que la version de Electron.
+    let atajos = [
+        (KeyCode::KeyH, "mostrar u ocultar las letras", Box::new(alternar) as Box<dyn Fn()>),
+        (
+            KeyCode::KeyJ,
+            "abrir los ajustes",
+            Box::new(move || settings::open(prefs, ajustes)) as Box<dyn Fn()>,
+        ),
+    ];
+    for (key, que, accion) in atajos {
+        let modificadores = Modifiers { ctrl: true, alt: true, ..Default::default() };
+        match app::hotkey(modificadores, key, accion) {
+            Ok(_) => log::info!("atajo Ctrl+Alt+{key:?} listo: {que}"),
+            // Otra app lo tiene: se dice y se sigue, que no es motivo para
+            // no arrancar.
+            Err(e) => log::warn!("sin atajo para {que}: {e}"),
+        }
+    }
+}
+
+/// Guarda donde esta la ventana para que el proximo arranque la ponga ahi.
+///
+/// APANO(chaika#7): chaika no avisa cuando la ventana se mueve — no hay un
+/// `Event::Moved` —, asi que no queda otra que mirar cada tanto. Un vistazo
+/// cada dos segundos no se nota y solo escribe cuando de verdad cambio.
+fn recordar_posicion(prefs: Prefs) {
+    fn vigilar(prefs: Prefs, ultima: Option<(f32, f32)>) {
+        chaika::task::after(std::time::Duration::from_secs(2), move || {
+            let ahora = app::window(WindowToken::MAIN)
+                .map(|w| w.position())
+                .map(|p| (p.x.get(), p.y.get()));
+            if let Some(pos) = ahora {
+                if ultima != Some(pos) {
+                    prefs.save_window(pos.0, pos.1);
+                }
+            }
+            vigilar(prefs, ahora);
+        });
+    }
+    vigilar(prefs, None);
+}
 
 fn demo() -> bool {
     std::env::args().any(|a| a == "--demo")
@@ -98,18 +208,37 @@ fn main() -> Result<(), chaika::platform::Error> {
     chaika::app::run(options, || {
         // Abajo y centrada, como la deja kuidy la primera vez.
         if let Some(window) = app::window(WindowToken::MAIN) {
-            if let Some(monitor) = window.primary_monitor() {
-                let area = monitor.work_area;
-                let size = window.size();
-                let x = area.origin.x + (area.size.width - size.width).half();
-                let y = area.origin.y + area.size.height - size.height - px(48.);
-                window.set_position(point(x, y));
+            match Prefs::window() {
+                // Donde el usuario la dejo la ultima vez.
+                Some((x, y)) => window.set_position(point(px(x), px(y))),
+                // La primera vez, abajo y centrada sobre el area util.
+                None => {
+                    if let Some(monitor) = window.primary_monitor() {
+                        let area = monitor.work_area;
+                        let size = window.size();
+                        let x = area.origin.x + (area.size.width - size.width).half();
+                        let y = area.origin.y + area.size.height - size.height - px(48.);
+                        window.set_position(point(x, y));
+                    }
+                }
             }
             window.set_visible(true);
         }
 
+        let prefs = Prefs::load();
         let playback = Playback::new();
         let visible = Signal::new(true);
+        conectar_mandos(prefs, visible);
+
+        recordar_posicion(prefs);
+
+        // Los clics pasan o no segun el ajuste; y si pasan, la ventana deja
+        // de poder arrastrarse, que es el trato.
+        Effect::new(move || {
+            if let Some(w) = app::window(WindowToken::MAIN) {
+                w.set_click_through(prefs.click_through.get());
+            }
+        });
 
         let lyrics = if demo() {
             // Sin tocar la red: cancion y letra inventadas.
@@ -127,6 +256,6 @@ fn main() -> Result<(), chaika::platform::Error> {
             lyrics
         };
 
-        Overlay { playback, lyrics }.view()
+        Overlay { playback, lyrics, prefs }.view()
     })
 }
