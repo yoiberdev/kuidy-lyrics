@@ -197,8 +197,9 @@ fn connect(playback: Playback, visible: Signal<bool>) {
     }
 
     log::info!("abriendo el navegador para entrar en Spotify");
+    let client_id = spotify::client_id();
     chaika::task::spawn(
-        || spotify::login(spotify::CLIENT_ID, open_browser),
+        move || spotify::login(&client_id, open_browser),
         move |result| match result {
             Ok(tokens) => {
                 tokens.save();

@@ -22,6 +22,50 @@ pub use auth::login;
 /// justamente para que esto no tenga que ser un secreto.
 pub const CLIENT_ID: &str = "47ad7282933c41c98f10e32a8dede477";
 
+/// Donde se puede dejar otro Client ID.
+const CLIENT_ID_FILE: &str = "client-id.txt";
+
+/// El Client ID que toca usar.
+///
+/// Spotify solo deja **cinco** cuentas autorizadas mientras una app esta en
+/// Development Mode, y desde 2025 ya no concede el modo ampliado a proyectos
+/// de una persona. O sea que el de aqui arriba solo funciona para las cinco
+/// cuentas que esten dadas de alta en el panel: cualquier otra recibe un
+/// 403 y no hay nada que hacer desde el codigo.
+///
+/// Por eso quien se baje el ejecutable puede poner el suyo, sacado de
+/// <https://developer.spotify.com/dashboard> en dos minutos. Se busca:
+///
+/// 1. La variable de entorno `SPOTIFY_CLIENT_ID`, para desarrollo.
+/// 2. `%APPDATA%\kuidy-rs\client-id.txt`, para el resto del mundo.
+/// 3. El de aqui arriba.
+pub fn client_id() -> String {
+    if let Ok(id) = std::env::var("SPOTIFY_CLIENT_ID") {
+        let id = id.trim().to_string();
+        if !id.is_empty() {
+            log::info!("Client ID tomado de SPOTIFY_CLIENT_ID");
+            return id;
+        }
+    }
+    if let Ok(dir) = crate::store::dir() {
+        if let Ok(texto) = std::fs::read_to_string(dir.join(CLIENT_ID_FILE)) {
+            // Se ignoran las lineas de comentario para poder explicar el
+            // archivo dentro del propio archivo.
+            let id: String = texto
+                .lines()
+                .map(str::trim)
+                .find(|l| !l.is_empty() && !l.starts_with('#'))
+                .unwrap_or_default()
+                .to_string();
+            if !id.is_empty() {
+                log::info!("Client ID tomado de {}", CLIENT_ID_FILE);
+                return id;
+            }
+        }
+    }
+    CLIENT_ID.to_string()
+}
+
 /// Donde se guarda la sesion.
 const TOKENS_FILE: &str = "kuidy-tokens.json";
 
@@ -296,6 +340,25 @@ fn to_now(response: PlayerResponse) -> Now {
         position: Duration::from_millis(response.progress_ms.unwrap_or(0)),
         playing: response.is_playing,
         track,
+    }
+}
+
+#[cfg(test)]
+mod tests_client_id {
+    use super::*;
+
+    #[test]
+    fn la_variable_de_entorno_manda() {
+        // Se usa una variable propia para no pisar la del entorno real.
+        let antes = std::env::var("SPOTIFY_CLIENT_ID").ok();
+        unsafe { std::env::set_var("SPOTIFY_CLIENT_ID", "  mio123  ") };
+        assert_eq!(client_id(), "mio123", "se recorta el espacio de sobra");
+        unsafe { std::env::set_var("SPOTIFY_CLIENT_ID", "   ") };
+        assert_ne!(client_id(), "", "una variable vacia no cuenta");
+        match antes {
+            Some(v) => unsafe { std::env::set_var("SPOTIFY_CLIENT_ID", v) },
+            None => unsafe { std::env::remove_var("SPOTIFY_CLIENT_ID") },
+        }
     }
 }
 

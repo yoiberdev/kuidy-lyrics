@@ -24,6 +24,28 @@ cargo test -- --ignored --nocapture   # ademas, 4 peticiones de verdad a lrclib 
 Ctrl+Alt+H muestra u oculta las letras; Ctrl+Alt+J abre los ajustes. El icono
 de la bandeja hace lo mismo, y ahi esta tambien Salir.
 
+## Conectar tu cuenta de Spotify
+
+Kuidy trae un Client ID dentro, pero **solo sirve para cinco cuentas**:
+Spotify limita a cinco los usuarios autorizados mientras una app esta en
+Development Mode, y desde 2025 ya no concede el modo ampliado a proyectos de
+una persona. Si no eres una de esas cinco, Spotify responde 403 y no hay nada
+que el programa pueda hacer.
+
+La solucion es poner el tuyo, que se saca gratis en dos minutos:
+
+1. Entra en <https://developer.spotify.com/dashboard> y crea una app.
+2. En *Redirect URIs* pon exactamente `http://127.0.0.1:8888/callback`.
+3. Copia el Client ID.
+4. Pegalo en `%APPDATA%\kuidy-rs\client-id.txt` (el archivo entero es el
+   ID; las lineas que empiecen por `#` se ignoran).
+
+En desarrollo es mas comodo la variable de entorno `SPOTIFY_CLIENT_ID`, que
+tiene prioridad sobre el archivo.
+
+No hace falta ningun client secret: kuidy usa PKCE y no lo pide. Si alguna
+guia te pide uno, no es para esto.
+
 El log va a `%APPDATA%\kuidy-rs\logs\main.log` y se abre desde el menu de la
 bandeja. La sesion se guarda en `%APPDATA%\kuidy-rs\kuidy-tokens.json`, en su
 propia carpeta: compartir el archivo con el kuidy de Electron seria pedir que los
