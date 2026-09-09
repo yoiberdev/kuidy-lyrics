@@ -2,6 +2,20 @@
 
 Overlay flotante de letras de Spotify para Windows. Ventana transparente, siempre al frente (incluso encima de juegos en *borderless fullscreen*), con UI minimalista y letras **sincronizadas** que se resaltan línea a línea con la canción.
 
+> ### Hay una version en Rust, y ya se puede descargar
+>
+> Kuidy se ha reescrito desde cero en Rust, sin Electron y sin navegador
+> dentro: **14 MB en vez de 392**, un proceso en vez de cinco. Hace lo mismo
+> —letras sincronizadas, traduccion y romaji— y ademas el romaji ya no
+> arrastra un diccionario de 17 MB.
+>
+> **[Descargar el .exe](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.1.0-alpha)**
+> · el codigo esta en [`kuidy-rs/`](https://github.com/yoiberdev/kuidy-lyrics/tree/beta/0.9.0/kuidy-rs)
+> (rama `beta/0.9.0`)
+>
+> Es una alpha y solo hay build de Windows. Lo de abajo describe la version
+> de Electron, que sigue siendo la estable.
+
 ## Cómo funciona
 
 - **Detección de canción**: usa la Spotify Web API (`/me/player/currently-playing`) — devuelve la pista y el progreso en ms con exactitud.
