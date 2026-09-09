@@ -26,3 +26,9 @@ opt-level = 3
 lto = "fat"
 codegen-units = 1
 strip = true
+
+[build-dependencies]
+resvg = { version = "0.48.1", default-features = false }
+usvg = { version = "0.48.1", default-features = false }
+tiny-skia = "0.12"
+winresource = "0.1.31"

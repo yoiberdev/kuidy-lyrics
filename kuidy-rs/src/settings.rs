@@ -33,6 +33,7 @@ pub fn open(prefs: Prefs, abierto: Signal<Option<WindowToken>>) {
     let options = AppOptions {
         window: WindowOptions {
             title: "kuidy — ajustes".into(),
+            icon: Some(crate::window_icon()),
             size: size(px(340.), px(430.)),
             transparent: false,
             decorations: true,

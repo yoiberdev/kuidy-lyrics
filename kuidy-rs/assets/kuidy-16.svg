@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- La misma mascota, dibujada para 16 pixeles.
+       A ese tamano cada rasgo mide un pixel y medio, asi que aqui no hay
+       degradado, ni brillo, ni mofletes: todo eso se convierte en barro.
+       Queda solo lo que aun se distingue (silueta, dos ojos y la boca) y
+       mas gordo de lo que tocaria. -->
+  <path d="M170 150 L170 46 Q170 30 187 30 Q204 30 204 46 L204 150 Z" fill="#ff9ec7"/>
+  <path d="M192 34 C248 52 258 108 218 146 C240 106 228 70 192 60 Z" fill="#ff9ec7"/>
+
+  <g transform="rotate(-7 100 158)">
+    <circle cx="100" cy="158" r="86" fill="#9a8bff"/>
+    <circle cx="72" cy="142" r="18" fill="#1a1030"/>
+    <circle cx="130" cy="142" r="18" fill="#1a1030"/>
+    <path d="M70 190 Q100 182 130 190 Q128 224 100 224 Q72 224 70 190 Z" fill="#1a1030"/>
+  </g>
+</svg>

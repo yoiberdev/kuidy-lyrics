@@ -30,22 +30,25 @@ use overlay::Overlay;
 use playback::{Playback, Track};
 use prefs::Prefs;
 
-/// El icono de la bandeja: un disco con el azul de kuidy.
+/// La mascota, ya en pixeles.
+///
+/// El dibujo vive en `assets/*.svg` y lo rasteriza `build.rs`, asi que aqui
+/// solo hay bytes: el binario no lleva ni un lector de SVG.
+fn icono(bytes: &[u8]) -> Icon {
+    let n = ((bytes.len() / 4) as f64).sqrt() as u32;
+    debug_assert_eq!((n * n * 4) as usize, bytes.len(), "el icono no es cuadrado");
+    Icon { width: n, height: n, rgba: bytes.to_vec() }
+}
+
+/// El icono de la bandeja: la version simplificada, que es la que aguanta
+/// a 16 pixeles.
 fn tray_icon() -> Icon {
-    let n = 32_u32;
-    let mut rgba = Vec::with_capacity((n * n * 4) as usize);
-    for y in 0..n {
-        for x in 0..n {
-            let (dx, dy) = (x as f32 - 15.5, y as f32 - 15.5);
-            let d = (dx * dx + dy * dy).sqrt();
-            // Un disco con un agujero: un vinilo, que es lo que suena.
-            let fuera = (15.0 - d).clamp(0.0, 1.0);
-            let dentro = (d - 4.0).clamp(0.0, 1.0);
-            let alpha = fuera * dentro;
-            rgba.extend([0x5b, 0x8c, 0xff, (alpha * 255.0) as u8]);
-        }
-    }
-    Icon { width: n, height: n, rgba }
+    icono(include_bytes!(concat!(env!("OUT_DIR"), "/bandeja.rgba")))
+}
+
+/// El de la ventana, que sale en la barra de tareas y al hacer Alt+Tab.
+pub fn window_icon() -> Icon {
+    icono(include_bytes!(concat!(env!("OUT_DIR"), "/ventana.rgba")))
 }
 
 fn menu_bandeja(visible: bool) -> Vec<MenuEntry> {
@@ -235,6 +238,7 @@ fn main() -> Result<(), chaika::platform::Error> {
     let options = AppOptions {
         window: WindowOptions {
             title: "kuidy".into(),
+            icon: Some(window_icon()),
             // Lo mismo que el overlay de Electron.
             size: size(px(420.), px(320.)),
             transparent: true,
