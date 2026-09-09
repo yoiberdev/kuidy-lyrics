@@ -22,8 +22,17 @@ function ShortcutRow({ keys, children }) {
   );
 }
 
-export default function GuideView({ onClose }) {
+// %APPDATA% en vez de C:\Users\<usuario>\AppData\Roaming: la ruta entera no cabe
+// en el pie y esta forma la entiende cualquiera que la pegue en el explorador.
+function shortLogDir(logPath) {
+  if (!logPath) return '';
+  const dir = logPath.replace(/[\\/][^\\/]+$/, '');
+  return dir.replace(/^.*[\\/]AppData[\\/]Roaming/i, '%APPDATA%');
+}
+
+export default function GuideView({ onClose, version, logPath }) {
   const [dontShowAgain, setDontShowAgain] = useState(true);
+  const logDir = shortLogDir(logPath);
 
   return (
     <motion.div
@@ -81,6 +90,27 @@ export default function GuideView({ onClose }) {
             Entendido
           </button>
         </div>
+
+        {(version || logDir) && (
+          <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center gap-2">
+            {/* Un tester que escribe "no me funciona" tiene que poder decir qué
+                build tiene y dónde está el registro sin que se lo preguntemos. */}
+            <div className="min-w-0 flex-1 text-[10px] text-white/50 truncate" title={logPath || ''}>
+              {version ? `v${version}` : ''}
+              {version && logDir ? ' · ' : ''}
+              {logDir ? `registros en ${logDir}` : ''}
+            </div>
+            {logPath && (
+              <button
+                type="button"
+                onClick={() => window.kuidy?.openLogs?.()}
+                className="no-drag shrink-0 text-[10px] text-white/70 hover:text-white underline underline-offset-2"
+              >
+                Abrir
+              </button>
+            )}
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );

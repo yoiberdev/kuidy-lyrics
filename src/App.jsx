@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import TitleBar from './components/TitleBar.jsx';
 import SetupView from './components/SetupView.jsx';
@@ -19,6 +19,15 @@ const DEFAULT_PALETTE = {
 const isPopover =
   typeof window !== 'undefined' && window.location.hash.replace(/^#/, '') === 'popover';
 
+// El main manda siempre { code, message, hint } y usa code:null para avisar de
+// que el error se resolvió. Se normaliza aquí para no repartir por la vista
+// objetos a medias si algún día llega un payload viejo.
+function normalizeError(e) {
+  if (!e || e.code === null) return null;
+  if (!e.message) return null;
+  return { code: e.code || 'unknown', message: e.message, hint: e.hint || '' };
+}
+
 export default function App() {
   if (isPopover) {
     return <PopoverView />;
@@ -28,6 +37,7 @@ export default function App() {
 
 function OverlayApp() {
   const [status, setStatus] = useState(null);
+  const [statusError, setStatusError] = useState(null);
   const [playback, setPlayback] = useState(null);
   const [lyricsState, setLyricsState] = useState({ lyrics: null, loadingLyrics: false });
   const [error, setError] = useState(null);
@@ -36,23 +46,44 @@ function OverlayApp() {
   const [prefs, setPrefs] = useState({ showSubs: true, fontScale: 1 });
   const [showGuide, setShowGuide] = useState(false);
 
+  // El status es la fuente de verdad de las preferencias y del modo flotante:
+  // llega al montar y cada vez que el main lo cambia.
+  const applyStatus = useCallback((s) => {
+    if (!s) return;
+    setStatus(s);
+    setStatusError(null);
+    setMinimal(!!s.minimalMode);
+    setPrefs({ showSubs: s.showSubs !== false, fontScale: s.fontScale || 1 });
+  }, []);
+
   useEffect(() => {
-    window.kuidy.getStatus().then((s) => {
-      setStatus(s);
-      if (s?.minimalMode) setMinimal(true);
-      setPrefs({ showSubs: s?.showSubs !== false, fontScale: s?.fontScale || 1 });
-      if (s && s.guideSeen === false) setShowGuide(true);
-    });
+    window.kuidy
+      .getStatus()
+      .then((s) => {
+        applyStatus(s);
+        if (s && s.guideSeen === false) setShowGuide(true);
+      })
+      .catch(() => {
+        // Si ni siquiera responde el IPC no se puede pintar el setup: sería
+        // mentirle al usuario diciéndole que le falta conectar Spotify.
+        setStatusError('No pudimos leer el estado de Kuidy. Ciérralo desde la bandeja y ábrelo otra vez.');
+      });
     // La letra ya puede estar cargada si la ventana se abre a mitad de canción.
-    window.kuidy.getLyrics?.().then((l) => {
-      if (l) setLyricsState(l);
-    });
-    const offPlay = window.kuidy.onPlayback((data) => {
-      setPlayback(data);
-      setError(null);
-    });
+    window.kuidy.getLyrics?.()
+      .then((l) => {
+        if (l) setLyricsState(l);
+      })
+      .catch(() => {
+        // Es solo un adelanto: el siguiente lyrics:update la trae igualmente.
+      });
+    const offPlay = window.kuidy.onPlayback((data) => setPlayback(data));
     const offLyrics = window.kuidy.onLyrics?.((data) => setLyricsState(data));
-    const offErr = window.kuidy.onPlaybackError((e) => setError(e.message));
+    // El poller avisa también cuando el error se resuelve, así que ya no hay
+    // que limpiarlo a ciegas en cada playback:update.
+    const offErr = window.kuidy.onPlaybackError((e) => setError(normalizeError(e)));
+    // Sin esto, conectar Spotify desde el popover dejaba al overlay clavado
+    // para siempre en la pantalla "Conecta con Spotify".
+    const offStatus = window.kuidy.onStatusChanged?.((s) => applyStatus(s));
     const offMin = window.kuidy.onMinimalModeChange?.((v) => setMinimal(!!v));
     const offPrefs = window.kuidy.onPrefs?.((p) =>
       setPrefs((prev) => ({
@@ -65,11 +96,12 @@ function OverlayApp() {
       offPlay?.();
       offLyrics?.();
       offErr?.();
+      offStatus?.();
       offMin?.();
       offPrefs?.();
       offGuide?.();
     };
-  }, []);
+  }, [applyStatus]);
 
   const closeGuide = (dontShowAgain) => {
     setShowGuide(false);
@@ -93,11 +125,24 @@ function OverlayApp() {
   }, [playback?.track?.id, playback?.track?.albumArt]);
 
   const refreshStatus = async () => {
-    const s = await window.kuidy.getStatus();
-    setStatus(s);
+    try {
+      applyStatus(await window.kuidy.getStatus());
+      setStatusError(null);
+    } catch {
+      setStatusError('No pudimos leer el estado de Kuidy. Ciérralo desde la bandeja y ábrelo otra vez.');
+    }
   };
 
-  const showSetup = !status || !status.hasClientId || !status.isAuthenticated;
+  // Hasta que no llega el status no se sabe nada: pintar el setup mientras
+  // tanto le enseñaba "Conecta con Spotify" a todo el mundo, ya conectado o no.
+  const showLoading = !status;
+  // Un 403 con el Client ID horneado significa que esta cuenta no está en las 5
+  // plazas de esa app de Spotify. No es un error transitorio y no se arregla
+  // reintentando: hay que llevar al usuario a crear la suya, así que el
+  // asistente sustituye a la letra en vez de quedarse como un aviso rojo.
+  const blockedByQuota = error?.code === 'forbidden' && status?.clientIdSource !== 'user';
+  const showSetup =
+    !!status && (!status.hasClientId || !status.isAuthenticated || blockedByQuota);
   const showChrome = !minimal;
 
   return (
@@ -141,8 +186,36 @@ function OverlayApp() {
         </AnimatePresence>
 
         <div className={`relative px-4 pb-3 ${showChrome ? 'h-[calc(100%-36px)]' : 'h-full pt-3'}`}>
+          {/* Fuera de la rama de carga: refreshStatus corre cuando el status ya
+              está cargado (tras guardar el Client ID o conectar), y ahí su fallo
+              no se veía en ninguna parte. */}
+          {statusError && !showLoading && showChrome && (
+            <div className="pb-1 text-[11px] text-rose-200/90 leading-snug">{statusError}</div>
+          )}
           <AnimatePresence mode="wait">
-            {showSetup ? (
+            {showLoading ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="h-full flex flex-col items-center justify-center text-center gap-2 px-3"
+              >
+                {statusError ? (
+                  <div className="text-[11px] text-rose-200/90 leading-snug max-w-[320px]">
+                    {statusError}
+                  </div>
+                ) : (
+                  showChrome && (
+                    <>
+                      <div className="text-[11px] text-white/70">Iniciando Kuidy...</div>
+                      <div className="w-24 h-1 rounded-full shimmer" />
+                    </>
+                  )
+                )}
+              </motion.div>
+            ) : showSetup ? (
               <motion.div
                 key="setup"
                 initial={{ opacity: 0, y: 8 }}
@@ -151,7 +224,7 @@ function OverlayApp() {
                 transition={{ duration: 0.25 }}
                 className="h-full"
               >
-                <SetupView status={status} onChange={refreshStatus} />
+                <SetupView status={status} onChange={refreshStatus} blocked={blockedByQuota ? error : null} />
               </motion.div>
             ) : (
               <motion.div
@@ -176,7 +249,13 @@ function OverlayApp() {
         </div>
 
         <AnimatePresence>
-          {showGuide && <GuideView onClose={closeGuide} />}
+          {showGuide && (
+            <GuideView
+              onClose={closeGuide}
+              version={status?.version}
+              logPath={status?.logPath}
+            />
+          )}
         </AnimatePresence>
       </div>
     </div>

@@ -5,7 +5,9 @@ contextBridge.exposeInMainWorld('kuidy', {
   getPlayback: () => ipcRenderer.invoke('app:getPlayback'),
   getLyrics: () => ipcRenderer.invoke('app:getLyrics'),
   authenticate: () => ipcRenderer.invoke('spotify:authenticate'),
+  cancelAuth: () => ipcRenderer.invoke('spotify:cancelAuth'),
   logout: () => ipcRenderer.invoke('spotify:logout'),
+  setClientId: (id) => ipcRenderer.invoke('spotify:setClientId', id),
 
   onPlayback: (cb) => {
     const handler = (_e, data) => cb(data);
@@ -47,6 +49,11 @@ contextBridge.exposeInMainWorld('kuidy', {
     ipcRenderer.on('popover:state', handler);
     return () => ipcRenderer.removeListener('popover:state', handler);
   },
+  onStatusChanged: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('status:changed', handler);
+    return () => ipcRenderer.removeListener('status:changed', handler);
+  },
 
   close: () => ipcRenderer.invoke('window:close'),
   hideOverlay: () => ipcRenderer.invoke('window:hideOverlay'),
@@ -56,9 +63,13 @@ contextBridge.exposeInMainWorld('kuidy', {
   setMinimalMode: (enabled) => ipcRenderer.invoke('window:setMinimalMode', enabled),
   setOpenAtLogin: (enabled) => ipcRenderer.invoke('app:setOpenAtLogin', enabled),
   setShowSubs: (enabled) => ipcRenderer.invoke('app:setShowSubs', enabled),
+  setSubsLang: (lang) => ipcRenderer.invoke('app:setSubsLang', lang),
+  setTranslateConsent: (enabled) => ipcRenderer.invoke('app:setTranslateConsent', enabled),
   setFontScale: (value) => ipcRenderer.invoke('app:setFontScale', value),
   showGuide: () => ipcRenderer.invoke('app:showGuide'),
   guideDismissed: (dontShowAgain) => ipcRenderer.invoke('app:guideDismissed', dontShowAgain),
+  openLogs: () => ipcRenderer.invoke('app:openLogs'),
+  openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
 
   closePopover: () => ipcRenderer.invoke('popover:close'),
   quit: () => ipcRenderer.invoke('app:quit'),

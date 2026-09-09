@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 function findCurrentLineIndex(lines, posMs) {
@@ -13,9 +13,34 @@ function findCurrentLineIndex(lines, posMs) {
       lo = mid + 1;
     } else {
       hi = mid - 1;
+
     }
   }
   return ans;
+}
+
+// El aviso de error nunca sustituye a la letra: un 429 o un corte de red de tres
+// segundos borraba la pantalla entera y el usuario perdía el hilo de la canción.
+function ErrorBanner({ error }) {
+  return (
+    <div className="mb-2 rounded-lg border border-rose-400/25 bg-rose-500/10 px-2.5 py-1.5">
+      <div className="text-[11px] text-rose-200 leading-snug">{error.message}</div>
+      {error.hint && (
+        <div className="text-[10px] text-white/70 leading-snug mt-0.5">{error.hint}</div>
+      )}
+    </div>
+  );
+}
+
+// En modo flotante los clicks atraviesan la ventana: una caja de error sería
+// imposible de quitar y se quedaría encima de lo que el usuario esté haciendo.
+function ErrorDot() {
+  return (
+    <div
+      className="pointer-events-none absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full"
+      style={{ background: 'rgba(251,113,133,0.9)', boxShadow: '0 0 6px rgba(0,0,0,0.9)' }}
+    />
+  );
 }
 
 export default function LyricsView({ playback, lyricsState, error, palette, minimal, prefs }) {
@@ -36,6 +61,21 @@ export default function LyricsView({ playback, lyricsState, error, palette, mini
   const linesRef = useRef([]);
   const containerRef = useRef(null);
   const activeRef = useRef(null);
+  const resizeObsRef = useRef(null);
+  // En un ref y no en estado: solo lo lee el scroll, y así scrollToActive puede
+  // ser estable y servir también de callback ref del contenedor.
+  const reduceMotionRef = useRef(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!mq) return;
+    reduceMotionRef.current = mq.matches;
+    const onChange = () => {
+      reduceMotionRef.current = mq.matches;
+    };
+    mq.addEventListener?.('change', onChange);
+    return () => mq.removeEventListener?.('change', onChange);
+  }, []);
 
   useEffect(() => {
     linesRef.current = synced ? lines : [];
@@ -76,13 +116,44 @@ export default function LyricsView({ playback, lyricsState, error, palette, mini
     return () => cancelAnimationFrame(raf);
   }, [isActivePlayback, synced]);
 
-  useEffect(() => {
-    if (!synced || !activeRef.current || !containerRef.current) return;
+  const scrollToActive = useCallback((smooth) => {
     const c = containerRef.current;
     const el = activeRef.current;
+    if (!c || !el) return;
     const targetTop = el.offsetTop - c.clientHeight / 2 + el.clientHeight / 2;
-    c.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
-  }, [currentIdx, synced]);
+    c.scrollTo({
+      top: Math.max(0, targetTop),
+      behavior: smooth && !reduceMotionRef.current ? 'smooth' : 'auto',
+    });
+  }, []);
+
+  // Callback ref en vez de un efecto: el contenedor se desmonta cada vez que se
+  // corta la reproducción, y con un efecto el observer se quedaba mirando al
+  // nodo viejo.
+  const attachContainer = useCallback(
+    (node) => {
+      containerRef.current = node;
+      resizeObsRef.current?.disconnect();
+      resizeObsRef.current = null;
+      if (!node || typeof ResizeObserver === 'undefined') return;
+      // Redimensionar la ventana no dispara ningún efecto por sí solo y la
+      // línea activa se quedaba fuera de pantalla hasta la siguiente.
+      const ro = new ResizeObserver(() => scrollToActive(false));
+      ro.observe(node);
+      resizeObsRef.current = ro;
+    },
+    [scrollToActive]
+  );
+
+  useEffect(() => () => resizeObsRef.current?.disconnect(), []);
+
+  // fontScale y showSubs cambian la altura de cada línea: sin ellos en las
+  // dependencias, tocar el tamaño de letra o las sub-líneas dejaba la línea
+  // activa descolocada hasta que la canción avanzaba.
+  useEffect(() => {
+    if (!synced) return;
+    scrollToActive(true);
+  }, [currentIdx, synced, fontScale, showSubs, scrollToActive]);
 
   // Estilos derivados de la paleta
   const accent = palette?.accent || '#c4b5fd';
@@ -100,27 +171,66 @@ export default function LyricsView({ playback, lyricsState, error, palette, mini
     0 0 24px rgba(${accentRgb},0.55)
   `;
 
-  if (error) {
+  // 'ad' y 'episode' se veían igual que "no se está reproduciendo nada", que es
+  // también lo que sale con la cuenta equivocada: el usuario no podía distinguirlos.
+  const kind = playback?.kind || 'track';
+  const isAd = kind === 'ad';
+  const isEpisode = kind === 'episode';
+  const hasTrack = !!(playback?.playing && playback.track && !isAd && !isEpisode);
+
+  if (!hasTrack) {
+    if (minimal) {
+      return (
+        <div className="relative h-full">
+          {error && <ErrorDot />}
+          {(isAd || isEpisode) && (
+            <div className="h-full flex items-center justify-center text-center px-2">
+              <div className="text-[12px] text-white/70" style={{ textShadow: minimalShadow }}>
+                {isAd ? 'Anuncio de Spotify' : 'Podcast: sin letra sincronizada'}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
     return (
-      <div className="h-full flex items-center justify-center px-4 text-center">
-        <div className="text-[11px] text-rose-300/90 leading-snug max-w-[340px]">{error}</div>
-      </div>
-    );
-  }
-  if (!playback) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-[11px] text-white/40">Conectando con Spotify...</div>
-      </div>
-    );
-  }
-  if (!playback.playing || !playback.track) {
-    if (minimal) return <div className="h-full" />;
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-center gap-2">
-        <div className="text-[28px]">🎧</div>
-        <div className="text-xs text-white/55">No se está reproduciendo nada</div>
-        <div className="text-[10px] text-white/30">Pon play en Spotify para empezar</div>
+      <div className="h-full flex flex-col items-center justify-center text-center gap-2 px-3">
+        {error ? (
+          // Aquí no hay letra que tapar y el error es lo único accionable.
+          <>
+            <div className="text-xs text-rose-200 leading-snug max-w-[340px]">{error.message}</div>
+            {error.hint && (
+              <div className="text-[10px] text-white/70 leading-snug max-w-[320px]">{error.hint}</div>
+            )}
+          </>
+        ) : !playback ? (
+          <div className="text-[11px] text-white/70">Conectando con Spotify...</div>
+        ) : isAd ? (
+          <>
+            <div className="text-xs text-white/70">Anuncio de Spotify</div>
+            <div className="text-[10px] text-white/70">La letra vuelve al acabar el anuncio.</div>
+          </>
+        ) : isEpisode ? (
+          <>
+            <div className="text-xs text-white/70 leading-snug max-w-[300px]">
+              Esto es un podcast, no tiene letra sincronizada
+            </div>
+            {playback.track?.name && (
+              <div className="text-[10px] text-white/70 truncate max-w-[280px]">
+                {playback.track.name}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="text-[28px]">🎧</div>
+            <div className="text-xs text-white/70">No se está reproduciendo nada</div>
+            <div className="text-[10px] text-white/70 leading-snug max-w-[300px]">
+              Si estás escuchando algo, comprueba que Spotify está en la misma cuenta que
+              autorizaste.
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -128,7 +238,10 @@ export default function LyricsView({ playback, lyricsState, error, palette, mini
   const { track, isPlaying } = playback;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="relative h-full flex flex-col">
+      {minimal && error && <ErrorDot />}
+      {!minimal && error && <ErrorBanner error={error} />}
+
       {!minimal && (
         <div className="flex items-center gap-2 mb-2">
           {track.albumArt ? (
@@ -150,13 +263,13 @@ export default function LyricsView({ playback, lyricsState, error, palette, mini
             </div>
           </div>
           {!isPlaying && (
-            <div className="text-[9px] uppercase tracking-wider text-white/30">pausa</div>
+            <div className="text-[9px] uppercase tracking-wider text-white/70">pausa</div>
           )}
         </div>
       )}
 
       <div
-        ref={containerRef}
+        ref={attachContainer}
         className={`relative flex-1 lyrics-scroll px-1 ${minimal ? 'minimal' : ''}`}
         style={{
           maskImage:
@@ -174,7 +287,7 @@ export default function LyricsView({ playback, lyricsState, error, palette, mini
               exit={{ opacity: 0 }}
               className="flex flex-col items-center justify-center h-full gap-2"
             >
-              {!minimal && <div className="text-[10px] text-white/40">Buscando letra...</div>}
+              {!minimal && <div className="text-[10px] text-white/70">Buscando letra...</div>}
               {!minimal && <div className="w-32 h-1 rounded-full shimmer" />}
             </motion.div>
           ) : synced ? (
@@ -255,7 +368,7 @@ export default function LyricsView({ playback, lyricsState, error, palette, mini
               className="py-3 text-center"
             >
               {!minimal && (
-                <div className="text-[10px] uppercase tracking-wider text-white/35 mb-2">
+                <div className="text-[10px] uppercase tracking-wider text-white/70 mb-2">
                   Letra (sin sincronizar)
                 </div>
               )}
@@ -278,7 +391,7 @@ export default function LyricsView({ playback, lyricsState, error, palette, mini
               key="instrumental"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="h-full flex items-center justify-center text-[11px] text-white/40"
+              className="h-full flex items-center justify-center text-[11px] text-white/70"
               style={{ textShadow: minimal ? minimalShadow : 'none' }}
             >
               ♪ Tema instrumental ♪
@@ -291,10 +404,14 @@ export default function LyricsView({ playback, lyricsState, error, palette, mini
               className="h-full flex items-center justify-center text-center px-2"
             >
               <div
-                className={minimal ? 'text-[12px] text-white/70' : 'text-[11px] text-white/40'}
+                className="text-[11px] text-white/70"
                 style={{ textShadow: minimal ? minimalShadow : 'none' }}
               >
-                {minimal ? '' : 'No encontramos letra para esta canción.'}
+                {minimal
+                  ? ''
+                  : lyrics?.errorKind
+                  ? 'No pudimos descargar la letra ahora mismo. Lo reintentamos en un momento.'
+                  : 'No encontramos letra para esta canción.'}
               </div>
             </motion.div>
           )}

@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="felpa" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#f4b45c"/>
+      <stop offset="1" stop-color="#dd8734"/>
+    </linearGradient>
+    <radialGradient id="pelusa" cx="0.34" cy="0.2" r="0.62">
+      <stop offset="0" stop-color="#fff1d2" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#fff1d2" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Un peluche, no un dibujo de un bicho: todo lo que se ve aqui es de
+       tela. Las costuras de puntos, la panza de otro color cosida encima,
+       los ojos de boton y la etiqueta que asoma por la cadera. -->
+
+  <!-- La etiqueta de tela. Va la primera para que asome por detras. -->
+  <g transform="rotate(-14 68 208)">
+    <rect x="48" y="197" width="32" height="22" rx="4" fill="#fff6e6"/>
+    <line x1="55" y1="203" x2="72" y2="203" stroke="#c9a171" stroke-width="3" stroke-linecap="round"/>
+    <line x1="55" y1="211" x2="66" y2="211" stroke="#c9a171" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- Patas y brazos, detras del cuerpo -->
+  <ellipse cx="74" cy="190" rx="21" ry="16" fill="#d97f31" transform="rotate(-24 74 190)"/>
+  <ellipse cx="182" cy="190" rx="21" ry="16" fill="#d97f31" transform="rotate(24 182 190)"/>
+  <ellipse cx="101" cy="234" rx="24" ry="14" fill="#d97f31"/>
+  <ellipse cx="155" cy="234" rx="24" ry="14" fill="#d97f31"/>
+
+  <!-- Las orejas. Son lo que salva la silueta cuando la cara ya no se ve -->
+  <ellipse cx="78" cy="56" rx="27" ry="32" fill="url(#felpa)" transform="rotate(-18 78 56)"/>
+  <ellipse cx="178" cy="56" rx="27" ry="32" fill="url(#felpa)" transform="rotate(18 178 56)"/>
+  <ellipse cx="80" cy="60" rx="13" ry="17" fill="#fdeacb" transform="rotate(-18 80 60)"/>
+  <ellipse cx="176" cy="60" rx="13" ry="17" fill="#fdeacb" transform="rotate(18 176 60)"/>
+
+  <!-- El cuerpo -->
+  <ellipse cx="128" cy="196" rx="57" ry="45" fill="url(#felpa)"/>
+
+  <!-- La panza, cosida encima con su puntada alrededor -->
+  <ellipse cx="128" cy="200" rx="34" ry="28" fill="#fdeacb"/>
+  <ellipse cx="128" cy="200" rx="34" ry="28" fill="none" stroke="#b8783a"
+           stroke-width="2.5" stroke-linecap="round" stroke-dasharray="1 9"/>
+  <!-- Una corchea bordada: lo unico que dice a que se dedica -->
+  <path d="M124 210 A7 5 0 1 0 138 210 A7 5 0 1 0 124 210 Z" fill="#8a5a2b"/>
+  <path d="M136 210 L136 186 L148 191 L148 197 L140 193 L140 210 Z" fill="#8a5a2b"/>
+
+  <!-- La cabeza -->
+  <ellipse cx="128" cy="116" rx="76" ry="68" fill="url(#felpa)"/>
+  <ellipse cx="128" cy="116" rx="76" ry="68" fill="url(#pelusa)"/>
+
+  <!-- La costura del medio, que es lo que lo delata como peluche -->
+  <path d="M128 50 L128 122" stroke="#b8783a" stroke-width="3"
+        stroke-linecap="round" stroke-dasharray="1 11"/>
+
+  <!-- Los ojos, de boton -->
+  <ellipse cx="97" cy="112" rx="12" ry="14" fill="#43291a"/>
+  <ellipse cx="159" cy="112" rx="12" ry="14" fill="#43291a"/>
+  <circle cx="93" cy="106" r="4.5" fill="#ffffff"/>
+  <circle cx="155" cy="106" r="4.5" fill="#ffffff"/>
+
+  <!-- El morro, otra pieza de tela -->
+  <ellipse cx="128" cy="148" rx="31" ry="23" fill="#fdeacb"/>
+  <path d="M118 138 Q128 133 138 138 Q128 149 118 138 Z" fill="#43291a"/>
+  <path d="M128 148 L128 154" stroke="#43291a" stroke-width="4" stroke-linecap="round"/>
+  <path d="M128 154 Q120 162 113 156" stroke="#43291a" stroke-width="4"
+        fill="none" stroke-linecap="round"/>
+  <path d="M128 154 Q136 162 143 156" stroke="#43291a" stroke-width="4"
+        fill="none" stroke-linecap="round"/>
+</svg>
