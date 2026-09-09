@@ -1,16 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-  <!-- La misma mascota, dibujada para 16 pixeles.
-       A ese tamano cada rasgo mide un pixel y medio, asi que aqui no hay
-       degradado, ni brillo, ni mofletes: todo eso se convierte en barro.
-       Queda solo lo que aun se distingue (silueta, dos ojos y la boca) y
-       mas gordo de lo que tocaria. -->
-  <path d="M170 150 L170 46 Q170 30 187 30 Q204 30 204 46 L204 150 Z" fill="#ff9ec7"/>
-  <path d="M192 34 C248 52 258 108 218 146 C240 106 228 70 192 60 Z" fill="#ff9ec7"/>
+  <!-- El mismo peluche a 16 pixeles, y aqui solo la cabeza.
+       Con el cuerpo entero le tocan ocho pixeles a la cabeza, tres a las
+       orejas y el resto a una mancha; recortando al busto, esos mismos
+       dieciseis pixeles se gastan en lo unico que se reconoce. Las orejas
+       van redondas y casi rectas: ladeadas salen en punta y parece un gato.
+       Tampoco hay costuras, ni etiqueta, ni panza: a este tamano son barro. -->
+  <circle cx="62" cy="70" r="36" fill="#e79a42"/>
+  <circle cx="194" cy="70" r="36" fill="#e79a42"/>
+  <circle cx="62" cy="72" r="17" fill="#fdeacb"/>
+  <circle cx="194" cy="72" r="17" fill="#fdeacb"/>
 
-  <g transform="rotate(-7 100 158)">
-    <circle cx="100" cy="158" r="86" fill="#9a8bff"/>
-    <circle cx="72" cy="142" r="18" fill="#1a1030"/>
-    <circle cx="130" cy="142" r="18" fill="#1a1030"/>
-    <path d="M70 190 Q100 182 130 190 Q128 224 100 224 Q72 224 70 190 Z" fill="#1a1030"/>
-  </g>
+  <ellipse cx="128" cy="146" rx="98" ry="90" fill="#e79a42"/>
+
+  <ellipse cx="93" cy="130" rx="16" ry="18" fill="#43291a"/>
+  <ellipse cx="163" cy="130" rx="16" ry="18" fill="#43291a"/>
+
+  <ellipse cx="128" cy="188" rx="40" ry="30" fill="#fdeacb"/>
+  <ellipse cx="128" cy="180" rx="15" ry="11" fill="#43291a"/>
 </svg>

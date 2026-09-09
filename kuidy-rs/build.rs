@@ -28,7 +28,12 @@ const ICO: [(u32, &str); 4] = [(16, PEQUENO), (32, COMPLETO), (48, COMPLETO), (2
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=assets");
+    // Archivo a archivo y no la carpeta: en Windows, cambiar un archivo no
+    // toca la fecha del directorio, asi que vigilar `assets` deja el icono
+    // viejo dentro del binario sin decir nada.
+    for svg in [COMPLETO, PEQUENO] {
+        println!("cargo:rerun-if-changed={svg}");
+    }
     let out = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
 
     // En crudo y no en PNG: descomprimir en la app pediria un

@@ -56,23 +56,29 @@ romaji, igual que no hay letra.
 
 ## La mascota
 
-Vive en `assets/kuidy.svg`, dibujada a mano: una corchea con cara. La
-silueta es la nota entera, plica y corchete incluidos, porque en la bandeja
-se ve a 16 pixeles y a ese tamano la cara ya no se distingue: lo unico que
-queda para decir "esto va de musica" es el contorno.
+Vive en `assets/kuidy.svg`, dibujada a mano: un peluche. Todo lo que se ve
+es de tela -- la costura del medio, la panza cosida encima con su puntada
+alrededor, los ojos de boton, la etiqueta que asoma por la cadera -- y en la
+panza lleva bordada una corchea, que es lo unico que dice a que se dedica.
 
-Hay **dos** dibujos. `kuidy-16.svg` es el mismo bicho sin degradado, sin
-brillo y sin mofletes, con los ojos y la nota mas gordos. No es pereza: a 16
-pixeles cada rasgo mide pixel y medio, y el degradado se convierte en barro.
-Reducir el dibujo grande da una mancha; dibujar aparte da un icono.
+Hay **dos** dibujos, y no son el mismo a distinto tamano. `kuidy-16.svg`
+es solo la cabeza. Con el cuerpo entero, a 16 pixeles le tocan ocho a la
+cabeza, tres a las orejas y el resto a una mancha; recortando al busto,
+esos mismos dieciseis pixeles se gastan en lo unico que se reconoce. Ahi
+tampoco hay costuras, ni etiqueta, ni panza: a ese tamano cada rasgo mide
+pixel y medio y todo eso se vuelve barro. Las orejas van redondas y casi
+rectas, porque ladeadas salen en punta y parece un gato.
 
 `build.rs` los rasteriza con `resvg` y saca:
 
 | Sale | De | Donde se ve |
 |---|---|---|
-| `bandeja.rgba` 16px | el simplificado | la bandeja del sistema |
+| `bandeja.rgba` 16px | la cabeza sola | la bandeja del sistema |
 | `ventana.rgba` 64px | el completo | barra de titulo, barra de tareas, Alt+Tab |
 | `kuidy.ico` 16/32/48/256 | los dos | el `.exe` en el explorador |
+
+El `.ico` mezcla los dos: el de 16 sale de la cabeza y el resto del peluche
+entero.
 
 `resvg` es dependencia **de build**, asi que el binario no lleva ni un
 lector de SVG: solo los pixeles ya cocinados, 37 KB en total. Y como se
