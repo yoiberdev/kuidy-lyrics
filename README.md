@@ -9,7 +9,7 @@ Overlay flotante de letras de Spotify para Windows. Ventana transparente, siempr
 > —letras sincronizadas, traduccion y romaji— y ademas el romaji ya no
 > arrastra un diccionario de 17 MB.
 >
-> **[Descargar el .exe](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.1.0-alpha)**
+> **[Descargar el .exe](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.1.1-alpha)**
 > · el codigo y sus instrucciones estan en [`kuidy-rs/`](kuidy-rs/)
 >
 > Es una alpha y solo hay build de Windows. Lo de abajo describe la version
