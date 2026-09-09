@@ -12,7 +12,7 @@ Los apanos que dependan de un arreglo en chaika llevan un comentario
 `// APANO(chaika#N):` para poder encontrarlos y quitarlos despues.
 
 ```sh
-cargo run -- --login             # la primera vez: abre el navegador y conecta la cuenta
+cargo run -- --login             # conecta la cuenta al arrancar (en el .exe: menu de la bandeja)
 cargo run                        # despues: usa la sesion guardada
 cargo run -- --demo              # sin cuenta: cancion fija, letra y traduccion de verdad
 cargo run -- --demo "YOASOBI - Yoru ni Kakeru"   # la cancion que se pida (para ver el romaji)
@@ -39,6 +39,7 @@ La solucion es poner el tuyo, que se saca gratis en dos minutos:
 3. Copia el Client ID.
 4. Pegalo en `%APPDATA%\kuidy-rs\client-id.txt` (el archivo entero es el
    ID; las lineas que empiecen por `#` se ignoran).
+5. Abre kuidy y pulsa **Conectar con Spotify...** en el menu de la bandeja.
 
 En desarrollo es mas comodo la variable de entorno `SPOTIFY_CLIENT_ID`, que
 tiene prioridad sobre el archivo.
