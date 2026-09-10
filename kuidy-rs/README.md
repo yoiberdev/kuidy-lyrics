@@ -53,7 +53,7 @@ para que probarlo no dependa de eso.
 ### El `.exe` que se publica
 
 ```sh
-cargo build --release          # queda en target/release/kuidy.exe, 14 MB
+cargo build --release          # queda en target/release/kuidy.exe, 20 MB
 ```
 
 El perfil de release lleva `lto = "fat"`, `codegen-units = 1` y `strip`, asi
@@ -117,28 +117,53 @@ un salto dentro de la cancion se refleja en unos 130 ms.
 | Ajustes que se guardan, popover, bandeja y atajos | hecho |
 | Traduccion de las lineas (Google, no oficial), con permiso | hecho |
 | Log a disco | hecho |
-| Romaji para japones | hecho, sin diccionario |
+| Romaji para japones, sin internet | hecho |
 | Mascota propia, y de ahi el icono de bandeja, ventana y .exe | hecho |
 
 **Nada de esto sale de la maquina sin permiso.** Traducir y romanizar
-mandan el texto de la letra a un servicio de fuera, asi que de serie estan
-apagados: la primera vez que hace falta se pregunta una sola vez, y lo que
-se conteste se guarda en `translationAsked`. Quien ya usaba kuidy conserva
-su ajuste, pero se le pregunta igual, porque nunca dio permiso explicito.
+manda el texto de la letra a un servicio de fuera, asi que de serie esta
+apagado: la primera vez que hace falta se pregunta una sola vez, y lo que se
+conteste se guarda en `translationAllowed`. Quien ya usaba kuidy conserva su
+ajuste de visualizacion, pero se le pregunta igual, porque nunca dio permiso
+explicito.
+
+Ojo con no confundir los dos interruptores, que antes eran uno y hacian un
+lio: `showSubs` decide si se **ensena** la linea de abajo, y
+`translationAllowed` decide si se **manda** la letra fuera para traducirla.
+
+## El romaji
 
 En japones se ensena la lectura y no la traduccion: la letra se canta, y sin
-romaji no hay por donde entrarle. Sale del mismo endpoint de Google que ya se
-usa para traducir (`dt=rm`), asi que **no cuesta ni un byte de binario**. El
-kuidy de Electron lo sacaba de kuroshiro con un diccionario de 17 MB, y las
-alternativas en Rust piden entre 1,7 y 50 MB para un binario que pesa 14.
+romaji no hay por donde entrarle.
 
-El trato: Google acierta las lecturas pero a veces pega las palabras
-(`Kiminonaha` donde tocaria `kimi no na wa`) y se equivoca con los kanji
-sueltos (`日` lo lee `Ni~Tsu` en vez de `hi`). Para cantar encima sirve; para
-estudiar japones, no. La otra cara es que necesita red: sin conexion no hay
-romaji, igual que no hay letra.
+**Se hace aqui, sin internet.** No pasa por Google, no pide permiso y
+funciona sin conexion. Cuesta 6,3 MB de diccionario dentro del binario, que
+se paga en disco y **nada en memoria hasta que suena algo en japones**: quien
+no escuche japones no lo carga nunca.
 
-## Los modulos
+Lo que hizo viable meterlo, despues de descartarlo dos veces por tamano, no
+fue encontrar un diccionario mas pequeno: fue darse cuenta de que el
+diccionario se recorta **por columnas y no por palabras**. IPADIC trae trece
+campos por entrada y para leer hacen falta tres -- categoria, subcategoria y
+lectura -- asi que tirando los otros nueve baja de 7,7 a 5,7 MB sin quitar ni
+una palabra. El recorte lo hace `tools/recortar-ipadic.py`.
+
+Y se eligio IPADIC y no UniDic por un detalle que solo se ve probandolo:
+IPADIC guarda la lectura (読み) y la pronunciacion (発音) por separado, asi
+que se puede leer は como "wa" en las particulas y 今日 como "kyou". El
+UniDic recortado, que por tamano tambien entraba, solo conserva la
+pronunciacion y da "kyoo" y "jinsee".
+
+Comparado con lo que habia: el kuidy de Electron cargaba kuroshiro con 17 MB
+de diccionario; kakasi cabia en 1,7 MB pero leia mal (君の名は le salia "kun
+no mei ha"); y lindera da las mismas lecturas que esto pero se lleva el
+binario a 45 MB porque embebe sin comprimir.
+
+Lo que no cubre: IPADIC no acierta con algunos numerales irregulares, asi que
+`romaji.rs` lleva una lista corta y a mano (一人, 二人, 大人). Es corta a
+proposito: una tabla larga seria un diccionario paralelo mal hecho.
+
+## Los modulos## Los modulos
 
 `src/` se parte por responsabilidad, no por capas. La linea que separa todo
 es la misma: **lo que toca la red bloquea y va en otro hilo, y lo que vuelve
@@ -155,7 +180,8 @@ son senales que la interfaz lee**. El overlay no sabe de donde sale la letra.
 | `lyrics.rs` | La letra y por que linea va. No habla con nadie: son datos y una busqueda |
 | `lrclib.rs` | lrclib.net: los dos endpoints y el orden en que se prueban |
 | `lrc.rs` | El formato LRC, con sus marcas de tiempo y los estribillos repetidos |
-| `translate.rs` | El endpoint no oficial de Google, del que salen tanto la traduccion como el romaji |
+| `translate.rs` | El endpoint no oficial de Google, de donde sale la traduccion. Solo se llama con permiso |
+| `romaji.rs` | La lectura del japones, aqui mismo: diccionario IPADIC recortado, cargado solo si hace falta |
 | `playback.rs` | Que suena y por donde va. El reloj de mentira que avanza solo es lo que hace posible el `--demo` |
 | `store.rs` | Donde viven los ajustes: la carpeta del usuario, nunca junto al binario |
 | `log_file.rs` | El log a disco. Sigue tapando lo que parezca un secreto, por si alguna vez vuelve a haberlos |

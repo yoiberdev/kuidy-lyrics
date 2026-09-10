@@ -5,12 +5,12 @@ Overlay flotante de letras de Spotify para Windows. Ventana transparente, siempr
 > ### Hay una version en Rust, y ya no pide cuenta de desarrollador
 >
 > Kuidy se ha reescrito desde cero en Rust, sin Electron y sin navegador
-> dentro: **14 MB en vez de 392**, un proceso en vez de cinco. Y desde la
-> 0.2.0 le pregunta a **Windows** que suena en lugar de a la API de Spotify,
-> asi que **no hay nada que conectar**: se abre y funciona, con cualquier
-> reproductor.
+> dentro: **20 MB en vez de 392**, un proceso en vez de cinco. Le pregunta a
+> **Windows** que suena en lugar de a la API de Spotify, asi que **no hay
+> nada que conectar**: se abre y funciona, con cualquier reproductor. Y el
+> romaji de las canciones japonesas se hace en tu equipo, sin internet.
 >
-> **[Descargar el .exe](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.2.1)**
+> **[Descargar el .exe](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.3.0)**
 > · el codigo y sus instrucciones estan en [`kuidy-rs/`](kuidy-rs/)
 >
 > Pide **Windows 10 1809 o posterior**; probado en Windows 11.
