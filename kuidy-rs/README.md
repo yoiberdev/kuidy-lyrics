@@ -12,45 +12,83 @@ Los apanos que dependan de un arreglo en chaika llevan un comentario
 `// APANO(chaika#N):` para poder encontrarlos y quitarlos despues.
 
 ```sh
-cargo run -- --login             # conecta la cuenta al arrancar (en el .exe: menu de la bandeja)
-cargo run                        # despues: usa la sesion guardada
-cargo run -- --demo              # sin cuenta: cancion fija, letra y traduccion de verdad
+cargo run                        # y ya: sigue lo que este sonando
+cargo run -- --demo              # sin tocar el reproductor: cancion fija, letra de verdad
 cargo run -- --demo "YOASOBI - Yoru ni Kakeru"   # la cancion que se pida (para ver el romaji)
 
-cargo test                       # 59 tests, sin tocar la red
+cargo test                       # 60 tests, sin tocar la red
 cargo test -- --ignored --nocapture   # ademas, 4 peticiones de verdad a lrclib y a Google
 ```
 
 Ctrl+Alt+H muestra u oculta las letras; Ctrl+Alt+J abre los ajustes. El icono
 de la bandeja hace lo mismo, y ahi esta tambien Salir.
 
-## Conectar tu cuenta de Spotify
+## Compilar
 
-Kuidy trae un Client ID dentro, pero **solo sirve para cinco cuentas**:
-Spotify limita a cinco los usuarios autorizados mientras una app esta en
-Development Mode, y desde 2025 ya no concede el modo ampliado a proyectos de
-una persona. Si no eres una de esas cinco, Spotify responde 403 y no hay nada
-que el programa pueda hacer.
+**chaika no esta en crates.io.** Es una dependencia por ruta, y la ruta es
+fija: `../../chaika/crates/chaika`. O sea que clonar solo este repo no basta
+para compilar el port -- `cargo build` falla antes de empezar si al lado no
+esta el otro repo. Los dos tienen que quedar como hermanos:
 
-La solucion es poner el tuyo, que se saca gratis en dos minutos:
+```text
+un-directorio-cualquiera/
+  kuidy-lyrics/      <- este repo
+    kuidy-rs/
+  chaika/            <- github.com/yoiberdev/chaika
+    crates/chaika/
+```
 
-1. Entra en <https://developer.spotify.com/dashboard> y crea una app.
-2. En *Redirect URIs* pon exactamente `http://127.0.0.1:8888/callback`.
-3. Copia el Client ID.
-4. Pegalo en `%APPDATA%\kuidy-rs\client-id.txt` (el archivo entero es el
-   ID; las lineas que empiecen por `#` se ignoran).
-5. Abre kuidy y pulsa **Conectar con Spotify...** en el menu de la bandeja.
+```sh
+git clone https://github.com/yoiberdev/kuidy-lyrics.git
+git clone https://github.com/yoiberdev/chaika.git
+cd kuidy-lyrics/kuidy-rs
+cargo run
+```
 
-En desarrollo es mas comodo la variable de entorno `SPOTIFY_CLIENT_ID`, que
-tiene prioridad sobre el archivo.
+Hace falta Rust 1.85 o mas nuevo, porque el crate es edicion 2024. Ahora
+mismo **chaika es un repo privado**, asi que hasta que se abra el port solo
+lo compila quien tenga acceso; el `.exe` de las releases existe justamente
+para que probarlo no dependa de eso.
 
-No hace falta ningun client secret: kuidy usa PKCE y no lo pide. Si alguna
-guia te pide uno, no es para esto.
+### El `.exe` que se publica
 
-El log va a `%APPDATA%\kuidy-rs\logs\main.log` y se abre desde el menu de la
-bandeja. La sesion se guarda en `%APPDATA%\kuidy-rs\kuidy-tokens.json`, en su
-propia carpeta: compartir el archivo con el kuidy de Electron seria pedir que los
-dos refresquen a la vez y se pisen.
+```sh
+cargo build --release          # queda en target/release/kuidy.exe, 14 MB
+```
+
+El perfil de release lleva `lto = "fat"`, `codegen-units = 1` y `strip`, asi
+que tarda bastante mas que un build normal. Dos cosas pasan solo aqui y no en
+`cargo run`:
+
+- `windows_subsystem = "windows"`, que es lo que evita la ventana negra de
+  consola detras de la app. En desarrollo no se pone a proposito: la consola
+  es justo donde uno quiere los logs.
+- Los iconos incrustados en el PE, que `build.rs` rasteriza desde los SVG con
+  `resvg` y `winresource` mete dentro (ver [La mascota](#la-mascota)).
+
+Como en release no hay consola, **la unica traza es el log a disco**. Si algo
+va mal en el binario publicado y no en `cargo run`, el archivo de log es el
+sitio donde mirar.
+
+## De donde sale lo que suena
+
+De **Windows**, no de Spotify. El sistema lleva un registro de lo que
+reproduce cada programa -- es lo que alimenta el panel de medios y los
+botones de reproduccion del teclado -- y ahi esta todo lo que una letra
+necesita: titulo, artista, album, duracion, posicion y si suena o no.
+
+Eso quita de en medio la cuenta de desarrollador, el Client ID, el OAuth,
+la cuota y el limite de cinco usuarios que Spotify impone a las apps en
+Development Mode. **No hay nada que conectar**: se abre y funciona. Y de
+propina sirve para cualquier reproductor, no solo para Spotify; si hay
+varios sonando, gana Spotify.
+
+El detalle que hay que entender para tocar `media.rs`: la posicion no es un
+cronometro. Windows publica una foto (`Position`) con la hora a la que se
+tomo (`LastUpdatedTime`), y Spotify solo la refresca cada dos segundos
+largos. La posicion de verdad es la foto mas lo que ha pasado desde esa
+hora. Medido contra el reloj, esa cuenta no se desvia ni un milisegundo, y
+un salto dentro de la cancion se refleja en unos 130 ms.
 
 ## Por donde va
 
@@ -58,10 +96,10 @@ dos refresquen a la vez y se pisen.
 |---|---|
 | Overlay: ventana sin marco, letra siguiendo a la cancion | hecho |
 | lrclib: buscar la letra, elegir candidato, leer LRC | hecho |
-| Spotify: cuenta (PKCE), que suena y por donde va | hecho |
+| Que suena y por donde va, leido de Windows | hecho |
 | Ajustes que se guardan, popover, bandeja y atajos | hecho |
 | Traduccion de las lineas (Google, no oficial) | hecho |
-| Log a disco, con secretos tapados | hecho |
+| Log a disco | hecho |
 | Romaji para japones | hecho, sin diccionario |
 | Mascota propia, y de ahi el icono de bandeja, ventana y .exe | hecho |
 
@@ -76,6 +114,28 @@ El trato: Google acierta las lecturas pero a veces pega las palabras
 sueltos (`日` lo lee `Ni~Tsu` en vez de `hi`). Para cantar encima sirve; para
 estudiar japones, no. La otra cara es que necesita red: sin conexion no hay
 romaji, igual que no hay letra.
+
+## Los modulos
+
+`src/` se parte por responsabilidad, no por capas. La linea que separa todo
+es la misma: **lo que toca la red bloquea y va en otro hilo, y lo que vuelve
+son senales que la interfaz lee**. El overlay no sabe de donde sale la letra.
+
+| Modulo | De que responde |
+|---|---|
+| `main.rs` | Arranque, ventanas, bandeja y atajos |
+| `overlay.rs` | La ventana sin marco: la linea que suena en grande, las de alrededor apagandose, y la lista moviendose sola |
+| `settings.rs` | El popover de ajustes, en ventana aparte para que el overlay pueda seguir siendo diminuto y dejar pasar los clics |
+| `prefs.rs` | Lo que el usuario deja puesto. Cada ajuste es una senal y se guarda solo, con un respiro para no escribir el disco en cada valor del deslizador |
+| `media.rs` | Preguntarle a Windows que suena, y convertir su foto de la posicion en un reloj. El ritmo baja cuando no mira nadie |
+| `fetch.rs` | El unico sitio donde se juntan las dos mitades: entra la cancion, sale la letra, y la interfaz no se para |
+| `lyrics.rs` | La letra y por que linea va. No habla con nadie: son datos y una busqueda |
+| `lrclib.rs` | lrclib.net: los dos endpoints y el orden en que se prueban |
+| `lrc.rs` | El formato LRC, con sus marcas de tiempo y los estribillos repetidos |
+| `translate.rs` | El endpoint no oficial de Google, del que salen tanto la traduccion como el romaji |
+| `playback.rs` | Que suena y por donde va. El reloj de mentira que avanza solo es lo que hace posible el `--demo` |
+| `store.rs` | Donde viven los ajustes: la carpeta del usuario, nunca junto al binario |
+| `log_file.rs` | El log a disco. Sigue tapando lo que parezca un secreto, por si alguna vez vuelve a haberlos |
 
 ## La mascota
 

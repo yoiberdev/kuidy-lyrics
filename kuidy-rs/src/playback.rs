@@ -1,8 +1,8 @@
 //! Que suena y por donde va.
 //!
-//! De momento lo inventa un reloj local; cuando entre Spotify, esta misma
-//! forma se rellenara con lo que diga su API. Lo importante es que el
-//! overlay no sepa de donde viene: solo lee senales.
+//! Lo rellena Windows a traves de `media`. El overlay no sabe de donde
+//! viene: solo lee senales, y eso es lo que deja que `fake` ponga aqui un
+//! reloj local para el `--demo` sin que nada mas se entere ni cambie.
 
 use std::time::{Duration, Instant};
 
@@ -11,7 +11,6 @@ use chaika::prelude::*;
 /// La cancion que suena.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Track {
-    pub id: String,
     pub name: String,
     pub artists: Vec<String>,
     /// El album, que lrclib usa para afinar la busqueda.
@@ -91,7 +90,6 @@ mod tests {
     #[test]
     fn los_artistas_se_leen_separados_por_comas() {
         let t = Track {
-            id: "1".into(),
             name: "x".into(),
             artists: vec!["Ana".into(), "Beto".into()],
             album: "y".into(),

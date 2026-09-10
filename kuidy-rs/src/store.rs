@@ -47,7 +47,11 @@ pub fn write(name: &str, contents: &str) -> io::Result<()> {
 }
 
 /// Borra un archivo de la carpeta de datos. No se queja si no estaba.
-pub fn remove(name: &str) {
+///
+/// Se quedo sin usuarios al dejar de guardarse la sesion de Spotify; sigue
+/// aqui porque las pruebas tienen que recoger lo que ensucian.
+#[cfg(test)]
+fn remove(name: &str) {
     if let Ok(dir) = dir() {
         let _ = std::fs::remove_file(dir.join(name));
     }
