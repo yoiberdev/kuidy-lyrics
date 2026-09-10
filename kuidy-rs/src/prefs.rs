@@ -34,6 +34,10 @@ pub struct Stored {
     pub show_subs: bool,
     #[serde(rename = "clickThrough")]
     pub click_through: bool,
+    /// Solo los subtitulos: sin panel, sin cabecera, la letra flotando
+    /// sobre el escritorio. El mismo nombre que en el kuidy de Electron.
+    #[serde(rename = "minimalMode")]
+    pub minimal: bool,
     /// Si se puede mandar la letra a traducir. Distinto de `show_subs`:
     /// uno es permiso y el otro es si se pinta.
     #[serde(rename = "translationAllowed")]
@@ -57,6 +61,7 @@ impl Default for Stored {
             font_scale: 1.0,
             show_subs: true,
             click_through: false,
+            minimal: false,
             // Traducir manda la letra entera a un servicio de fuera, y eso
             // no se hace sin permiso. El romaji no pasa por aqui: se hace
             // en la maquina y no pide nada.
@@ -78,6 +83,8 @@ pub struct Prefs {
     pub show_subs: Signal<bool>,
     /// Si los clics atraviesan el overlay y llegan a lo que hay debajo.
     pub click_through: Signal<bool>,
+    /// Solo los subtitulos, sin panel ni cabecera.
+    pub minimal: Signal<bool>,
     /// Si se puede mandar la letra a traducir.
     pub translation_allowed: Signal<bool>,
     /// Si ya se pregunto por la traduccion.
@@ -106,6 +113,7 @@ impl Prefs {
             font_scale: Signal::new(stored.font_scale.clamp(0.8, 1.6)),
             show_subs: Signal::new(stored.show_subs),
             click_through: Signal::new(stored.click_through),
+            minimal: Signal::new(stored.minimal),
             translation_allowed: Signal::new(stored.translation_allowed),
             translation_asked: Signal::new(stored.translation_asked),
             window: Signal::new(stored.window),
@@ -121,6 +129,7 @@ impl Prefs {
             font_scale: self.font_scale.get_untracked(),
             show_subs: self.show_subs.get_untracked(),
             click_through: self.click_through.get_untracked(),
+            minimal: self.minimal.get_untracked(),
             translation_allowed: self.translation_allowed.get_untracked(),
             translation_asked: self.translation_asked.get_untracked(),
             window: self.window.get_untracked(),
@@ -142,6 +151,7 @@ impl Prefs {
                 prefs.font_scale.get(),
                 prefs.show_subs.get(),
                 prefs.click_through.get(),
+                prefs.minimal.get(),
                 prefs.translation_allowed.get(),
                 prefs.translation_asked.get(),
             );

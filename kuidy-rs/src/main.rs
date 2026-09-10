@@ -113,9 +113,15 @@ fn etiqueta_toggle(visible: bool) -> &'static str {
     if visible { "Ocultar letras" } else { "Mostrar letras" }
 }
 
-fn menu_bandeja(visible: bool) -> Vec<MenuEntry> {
+/// El texto de la entrada del modo de solo subtitulos.
+fn etiqueta_minimal(minimal: bool) -> &'static str {
+    if minimal { "Volver al panel" } else { "Solo subtitulos" }
+}
+
+fn menu_bandeja(visible: bool, minimal: bool) -> Vec<MenuEntry> {
     vec![
         MenuEntry::item("toggle", etiqueta_toggle(visible)),
+        MenuEntry::item("minimal", etiqueta_minimal(minimal)),
         MenuEntry::item("ajustes", "Ajustes..."),
         MenuEntry::separator(),
         // Quien reporte un fallo tiene que poder mandar el log sin ir a
@@ -146,16 +152,29 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
         app::with_tray(|t| t.set_label("toggle", etiqueta_toggle(ahora)));
     };
 
+    // Solo los subtitulos: se va el panel y los clics pasan de largo, que es
+    // como lo hacia el kuidy de Electron -- los dos ajustes viajaban juntos,
+    // porque una letra flotando sin fondo que ademas se traga los clics no
+    // tiene ningun sentido.
+    let alternar_minimal = move || {
+        let ahora = !prefs.minimal.get_untracked();
+        prefs.minimal.set(ahora);
+        prefs.click_through.set(ahora);
+        app::with_tray(|t| t.set_label("minimal", etiqueta_minimal(ahora)));
+        log::info!("solo subtitulos: {}", if ahora { "encendido" } else { "apagado" });
+    };
+
     if let Err(e) = app::tray(TrayOptions {
         icon: tray_icon(),
         tooltip: concat!("kuidy v", env!("CARGO_PKG_VERSION")).into(),
-        menu: menu_bandeja(true),
+        menu: menu_bandeja(true, prefs.minimal.get_untracked()),
     }) {
         log::error!("sin icono en la bandeja: {e}");
     }
 
     app::on_menu(move |id| match id {
         "toggle" => alternar(),
+        "minimal" => alternar_minimal(),
         "ajustes" => settings::open(prefs, ajustes),
         "logs" => match log_file::dir() {
             Some(dir) => {
@@ -190,6 +209,11 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
             KeyCode::KeyJ,
             "abrir los ajustes",
             Box::new(move || settings::open(prefs, ajustes)) as Box<dyn Fn()>,
+        ),
+        (
+            KeyCode::KeyM,
+            "dejar solo los subtitulos",
+            Box::new(alternar_minimal) as Box<dyn Fn()>,
         ),
     ];
     for (key, que, accion) in atajos {

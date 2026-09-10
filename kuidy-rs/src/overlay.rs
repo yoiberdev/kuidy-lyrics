@@ -45,17 +45,38 @@ impl Overlay {
             }
         });
 
+        let minimal = prefs.minimal;
         div()
             .size_full()
             .flex_col()
             .rounded(px(14.))
             // La opacidad del ajuste se aplica al fondo, no a todo: el texto
             // tiene que seguir leyendose sobre cualquier escritorio.
-            .bg(derive(move || FONDO.with_alpha(FONDO.a * prefs.opacity.get())))
+            //
+            // En "solo subtitulos" no hay fondo ninguno: la letra flota sobre
+            // lo que haya, y de eso se encarga el contorno de abajo.
+            .bg(derive(move || {
+                if minimal.get() {
+                    FONDO.with_alpha(0.)
+                } else {
+                    FONDO.with_alpha(FONDO.a * prefs.opacity.get())
+                }
+            }))
+            // Sin panel detras, el texto se apoya en el escritorio, que puede
+            // ser de cualquier color. Sin contorno no hay color de letra que
+            // sirva para todos.
+            // Un pixel basta y sobra: con mas, el contorno se come la letra
+            // pequena de la traduccion, que es la que menos margen tiene.
+            .text_outline(derive(move || {
+                TextOutline::new(
+                    if minimal.get() { px(1.) } else { px(0.) },
+                    Color::rgba8(0, 0, 0, if minimal.get() { 190 } else { 0 }),
+                )
+            }))
             .family("Segoe UI, sans-serif")
             // Sin barra de titulo: se arrastra por donde sea.
             .drag_window()
-            .child(cabecera(&playback))
+            .child(cabecera(&playback, minimal))
             .child(
                 div()
                     .flex_1()
@@ -105,13 +126,16 @@ impl Overlay {
             // Los bordes se desvanecen para que las lineas no aparezcan
             // cortadas: dos degradados del color del fondo a nada, encima de
             // la lista y sin estorbar al puntero.
-            .child(velo(true))
-            .child(velo(false))
+            .child(velo(true, minimal))
+            .child(velo(false, minimal))
     }
 }
 
 /// El desvanecido de arriba o de abajo.
-fn velo(arriba: bool) -> Element {
+///
+/// En "solo subtitulos" desaparece: es del color del panel, y sin panel se
+/// veria como dos bandas oscuras flotando sobre el escritorio.
+fn velo(arriba: bool, minimal: Signal<bool>) -> Element {
     let transparente = Color::rgba(FONDO.r, FONDO.g, FONDO.b, 0.0);
     let (from, to) = if arriba { (FONDO, transparente) } else { (transparente, FONDO) };
     let mut v = div()
@@ -120,16 +144,25 @@ fn velo(arriba: bool) -> Element {
         .w_full()
         .h(px(56.))
         .pointer_none()
-        .gradient(Gradient::vertical(from, to));
-    v = if arriba { v.top(px(52.)) } else { v.bottom(px(0.)) };
+        .gradient(derive(move || {
+            if minimal.get() {
+                Gradient::vertical(transparente, transparente)
+            } else {
+                Gradient::vertical(from, to)
+            }
+        }));
+    v = if arriba { v.top(derive(move || if minimal.get() { px(0.) } else { px(52.) })) } else { v.bottom(px(0.)) };
     v
 }
 
 /// Titulo y artista de lo que suena.
-fn cabecera(playback: &Playback) -> Element {
+fn cabecera(playback: &Playback, minimal: Signal<bool>) -> Element {
     let track = playback.track;
     let playing = playback.playing;
     div()
+        // En "solo subtitulos" no hay cabecera: el titulo y el artista los
+        // sabe el usuario, que para eso los esta escuchando.
+        .visible(derive(move || !minimal.get()))
         .w_full()
         .flex_row()
         .items_center()

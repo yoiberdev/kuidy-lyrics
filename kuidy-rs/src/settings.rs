@@ -15,6 +15,18 @@ const MUTED: Color = Color::hex(0x8a8a9a);
 
 /// Abre el popover, o lo trae al frente si ya estaba.
 pub fn open(prefs: Prefs, abierto: Signal<Option<WindowToken>>) {
+    // Abrir los ajustes devuelve los clics al overlay, siempre.
+    //
+    // Es la salvaguarda que el kuidy de Electron escribio despues de que
+    // alguien se quedara encerrado: con los clics atravesando y el panel
+    // quitado, el overlay no se puede ni agarrar ni pulsar, y si ademas
+    // fallo el registro del atajo no queda ninguna salida. Si el usuario
+    // vino a los ajustes, es que quiere tocar algo.
+    if prefs.click_through.get_untracked() {
+        log::info!("ajustes abiertos: se devuelven los clics al overlay");
+        prefs.click_through.set(false);
+    }
+
     if let Some(token) = abierto.get_untracked() {
         if let Some(window) = app::window(token) {
             window.focus();
@@ -85,6 +97,7 @@ fn view(prefs: Prefs, token: WindowToken) -> Element {
             div()
                 .flex_col()
                 .gap(px(12.))
+                .child(switch_row("Solo subtitulos", prefs.minimal))
                 .child(switch_row("Ensenar la linea de abajo", prefs.show_subs))
                 .child(switch_row("Traducir la letra", prefs.translation_allowed))
                 .child(switch_row("Dejar pasar los clics", prefs.click_through)),
