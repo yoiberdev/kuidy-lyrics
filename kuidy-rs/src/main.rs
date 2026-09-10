@@ -55,9 +55,14 @@ pub fn window_icon() -> Icon {
     icono(include_bytes!(concat!(env!("OUT_DIR"), "/ventana.rgba")))
 }
 
+/// El texto de la entrada que muestra u oculta las letras.
+fn etiqueta_toggle(visible: bool) -> &'static str {
+    if visible { "Ocultar letras" } else { "Mostrar letras" }
+}
+
 fn menu_bandeja(visible: bool) -> Vec<MenuEntry> {
     vec![
-        MenuEntry::item("toggle", if visible { "Ocultar letras" } else { "Mostrar letras" }),
+        MenuEntry::item("toggle", etiqueta_toggle(visible)),
         MenuEntry::item("ajustes", "Ajustes..."),
         MenuEntry::separator(),
         // Quien reporte un fallo tiene que poder mandar el log sin ir a
@@ -82,7 +87,10 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
         if let Some(w) = app::window(WindowToken::MAIN) {
             w.set_visible(ahora);
         }
-        app::with_tray(|t| t.set_menu(&menu_bandeja(ahora)));
+        // Solo el texto de esa entrada, no el menu entero: reconstruirlo
+        // deja abandonada una ventana de menu de Windows de 6x6 pixeles,
+        // que se queda flotando en pantalla para siempre (chaika#9).
+        app::with_tray(|t| t.set_label("toggle", etiqueta_toggle(ahora)));
     };
 
     if let Err(e) = app::tray(TrayOptions {
