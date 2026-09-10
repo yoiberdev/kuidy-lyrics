@@ -115,10 +115,16 @@ un salto dentro de la cancion se refleja en unos 130 ms.
 | lrclib: buscar la letra, elegir candidato, leer LRC | hecho |
 | Que suena y por donde va, leido de Windows | hecho |
 | Ajustes que se guardan, popover, bandeja y atajos | hecho |
-| Traduccion de las lineas (Google, no oficial) | hecho |
+| Traduccion de las lineas (Google, no oficial), con permiso | hecho |
 | Log a disco | hecho |
 | Romaji para japones | hecho, sin diccionario |
 | Mascota propia, y de ahi el icono de bandeja, ventana y .exe | hecho |
+
+**Nada de esto sale de la maquina sin permiso.** Traducir y romanizar
+mandan el texto de la letra a un servicio de fuera, asi que de serie estan
+apagados: la primera vez que hace falta se pregunta una sola vez, y lo que
+se conteste se guarda en `translationAsked`. Quien ya usaba kuidy conserva
+su ajuste, pero se le pregunta igual, porque nunca dio permiso explicito.
 
 En japones se ensena la lectura y no la traduccion: la letra se canta, y sin
 romaji no hay por donde entrarle. Sale del mismo endpoint de Google que ya se

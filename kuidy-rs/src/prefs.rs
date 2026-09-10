@@ -34,6 +34,12 @@ pub struct Stored {
     pub show_subs: bool,
     #[serde(rename = "clickThrough")]
     pub click_through: bool,
+    /// Si ya se pregunto por la traduccion. Es de kuidy en Rust y no existe
+    /// en el archivo de Electron; los archivos viejos no lo llevan y por
+    /// eso entran como `false`, que es lo que toca: a esa gente todavia no
+    /// se le ha preguntado nada.
+    #[serde(rename = "translationAsked")]
+    pub translation_asked: bool,
     /// Donde estaba la ventana. Sin esto, cada arranque la pone en el centro
     /// y el usuario la vuelve a mover al mismo sitio.
     #[serde(default)]
@@ -45,8 +51,13 @@ impl Default for Stored {
         Self {
             opacity: 0.95,
             font_scale: 1.0,
-            show_subs: true,
+            // Apagada de serie: traducir manda la letra entera a un
+            // servicio de fuera, y eso no se hace sin permiso. La primera
+            // vez que haga falta se pregunta, y lo que se conteste se
+            // queda.
+            show_subs: false,
             click_through: false,
+            translation_asked: false,
             window: None,
         }
     }
@@ -63,6 +74,8 @@ pub struct Prefs {
     pub show_subs: Signal<bool>,
     /// Si los clics atraviesan el overlay y llegan a lo que hay debajo.
     pub click_through: Signal<bool>,
+    /// Si ya se pregunto por la traduccion.
+    pub translation_asked: Signal<bool>,
     /// Donde quedo la ventana. Vive aqui y no se relee del disco: antes,
     /// cada guardado abria y parseaba el archivo solo para recuperar este
     /// campo, y encima desde el hilo de la interfaz.
@@ -87,6 +100,7 @@ impl Prefs {
             font_scale: Signal::new(stored.font_scale.clamp(0.8, 1.6)),
             show_subs: Signal::new(stored.show_subs),
             click_through: Signal::new(stored.click_through),
+            translation_asked: Signal::new(stored.translation_asked),
             window: Signal::new(stored.window),
         };
         prefs.save_on_change();
@@ -100,6 +114,7 @@ impl Prefs {
             font_scale: self.font_scale.get_untracked(),
             show_subs: self.show_subs.get_untracked(),
             click_through: self.click_through.get_untracked(),
+            translation_asked: self.translation_asked.get_untracked(),
             window: self.window.get_untracked(),
         }
     }
@@ -113,12 +128,13 @@ impl Prefs {
         let prefs = *self;
         let pending = std::rc::Rc::new(std::cell::Cell::new(false));
         Effect::new(move || {
-            // Leer los cuatro para suscribirse a todos.
+            // Leerlos todos para suscribirse a todos.
             let _ = (
                 prefs.opacity.get(),
                 prefs.font_scale.get(),
                 prefs.show_subs.get(),
                 prefs.click_through.get(),
+                prefs.translation_asked.get(),
             );
             if pending.replace(true) {
                 // Ya hay una escritura en camino: recogera tambien esto.
@@ -160,7 +176,11 @@ mod tests {
         let d = Stored::default();
         assert_eq!(d.opacity, 0.95);
         assert_eq!(d.font_scale, 1.0);
-        assert!(d.show_subs);
+        assert!(
+            !d.show_subs,
+            "de serie no se traduce: eso manda la letra fuera y nadie lo ha autorizado"
+        );
+        assert!(!d.translation_asked, "y todavia no se ha preguntado");
         assert!(!d.click_through, "de serie el overlay recibe clics");
     }
 
@@ -176,9 +196,28 @@ mod tests {
         let s: Stored = serde_json::from_str(viejo).expect("se entiende igual");
         assert_eq!(s.opacity, 0.6, "lo que si estaba se respeta");
         assert_eq!(s.font_scale, 1.2);
-        assert!(s.show_subs, "y lo que falta toma el valor DE SERIE, no el del tipo");
+        assert!(!s.show_subs, "y lo que falta toma el valor DE SERIE, no el del tipo");
         assert!(!s.click_through);
         assert_eq!(s.window, None);
+    }
+
+    /// Quien ya usaba kuidy tiene `showSubs` escrito en su archivo, asi que
+    /// conserva lo que tuviera. Lo que no tiene es `translationAsked`, y por
+    /// eso se le pregunta una vez: nunca dio permiso explicito.
+    #[test]
+    fn a_quien_ya_lo_usaba_se_le_respeta_el_ajuste_pero_se_le_pregunta() {
+        let de_antes = r#"{"opacity":0.9,"fontScale":1.0,"showSubs":true,"clickThrough":false}"#;
+        let s: Stored = serde_json::from_str(de_antes).expect("se entiende");
+        assert!(s.show_subs, "lo que tenia puesto no se le toca");
+        assert!(!s.translation_asked, "pero no consta que se le preguntara");
+    }
+
+    #[test]
+    fn una_vez_contestado_no_se_vuelve_a_preguntar() {
+        let contestado = r#"{"showSubs":false,"translationAsked":true}"#;
+        let s: Stored = serde_json::from_str(contestado).expect("se entiende");
+        assert!(!s.show_subs);
+        assert!(s.translation_asked);
     }
 
     #[test]
@@ -203,7 +242,7 @@ mod tests {
             serde_json::from_str(r#"{"opacity":0.5}"#).expect("lo que falta se rellena");
         assert_eq!(parcial.opacity, 0.5);
         assert_eq!(parcial.font_scale, 1.0);
-        assert!(parcial.show_subs);
+        assert!(!parcial.show_subs, "y el de serie de la traduccion es apagada");
 
         // Y con todos menos `window`, que si lo tiene, se lee bien.
         let completo: Stored = serde_json::from_str(

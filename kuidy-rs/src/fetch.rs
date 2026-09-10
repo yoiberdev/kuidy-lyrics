@@ -103,18 +103,51 @@ pub fn follow(track: Signal<Option<Track>>, prefs: Prefs) -> Signal<State> {
     // pegada a la busqueda para que encenderlo a mitad de cancion traduzca
     // la que esta sonando, en vez de la siguiente.
     let traducida = Rc::new(Cell::new(0_u64));
+    let preguntando = Rc::new(Cell::new(false));
     Effect::new(move || {
         let quiere = prefs.show_subs.get();
+        let preguntado = prefs.translation_asked.get();
         // Leer el estado aqui suscribe: cuando llega la letra, esto vuelve.
         let pendiente = state.with(|s| match s {
             State::Ready(l) if l.lines.iter().any(|x| x.translation.is_none()) => Some(l.clone()),
             _ => None,
         });
         let mine = generacion.get();
-        if !quiere || traducida.get() == mine {
+        if traducida.get() == mine {
             return;
         }
         let Some(lyrics) = pendiente else { return };
+
+        // La primera letra que se podria traducir es el momento de
+        // preguntar: es cuando el permiso significa algo y cuando el usuario
+        // entiende para que se lo piden. Hasta que conteste no sale nada.
+        if !preguntado {
+            if preguntando.replace(true) {
+                return;
+            }
+            log::info!("primera letra traducible: se pide permiso");
+            let preguntando = Rc::clone(&preguntando);
+            chaika::dialog::message(
+                "kuidy",
+                "Para traducir la letra -- y para poner el romaji de las canciones                  en japones -- kuidy manda el texto de la letra a Google.
+
+                 Nada sale de tu equipo si dices que no, y puedes cambiar de                  idea cuando quieras en Ajustes.
+
+                 Traducir la letra?",
+            )
+            .confirm(move |si| {
+                log::info!("permiso para traducir: {}", if si { "concedido" } else { "denegado" });
+                prefs.show_subs.set(si);
+                // Esto despierta este mismo efecto, y ahora ya con respuesta.
+                prefs.translation_asked.set(true);
+                preguntando.set(false);
+            });
+            return;
+        }
+
+        if !quiere {
+            return;
+        }
         // Marcar antes de lanzar: al volver, la traduccion escribe el estado
         // y este efecto se despierta otra vez.
         traducida.set(mine);
