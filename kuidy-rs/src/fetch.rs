@@ -105,7 +105,7 @@ pub fn follow(track: Signal<Option<Track>>, prefs: Prefs) -> Signal<State> {
     let traducida = Rc::new(Cell::new(0_u64));
     let preguntando = Rc::new(Cell::new(false));
     Effect::new(move || {
-        let quiere = prefs.show_subs.get();
+        let quiere = prefs.translation_allowed.get();
         let preguntado = prefs.translation_asked.get();
         // Leer el estado aqui suscribe: cuando llega la letra, esto vuelve.
         let pendiente = state.with(|s| match s {
@@ -118,6 +118,14 @@ pub fn follow(track: Signal<Option<Track>>, prefs: Prefs) -> Signal<State> {
         }
         let Some(lyrics) = pendiente else { return };
 
+        // El romaji se hace aqui dentro, sin red y sin mandar nada a
+        // ninguna parte, asi que no hay permiso que pedir: se pone y ya.
+        if en_japones(&lyrics) {
+            traducida.set(mine);
+            romanizar(state, lyrics, mine, Rc::clone(&generacion));
+            return;
+        }
+
         // La primera letra que se podria traducir es el momento de
         // preguntar: es cuando el permiso significa algo y cuando el usuario
         // entiende para que se lo piden. Hasta que conteste no sale nada.
@@ -129,15 +137,18 @@ pub fn follow(track: Signal<Option<Track>>, prefs: Prefs) -> Signal<State> {
             let preguntando = Rc::clone(&preguntando);
             chaika::dialog::message(
                 "kuidy",
-                "Para traducir la letra -- y para poner el romaji de las canciones                  en japones -- kuidy manda el texto de la letra a Google.
-
-                 Nada sale de tu equipo si dices que no, y puedes cambiar de                  idea cuando quieras en Ajustes.
-
-                 Traducir la letra?",
+                concat!(
+                    "Para traducir la letra, kuidy manda el texto a Google.\n\n",
+                    "Nada sale de tu equipo si dices que no, y puedes cambiar de idea ",
+                    "cuando quieras en Ajustes.\n\n",
+                    "El romaji de las canciones en japones no usa internet, y funciona ",
+                    "digas lo que digas.\n\n",
+                    "Traducir la letra?",
+                ),
             )
             .confirm(move |si| {
                 log::info!("permiso para traducir: {}", if si { "concedido" } else { "denegado" });
-                prefs.show_subs.set(si);
+                prefs.translation_allowed.set(si);
                 // Esto despierta este mismo efecto, y ahora ya con respuesta.
                 prefs.translation_asked.set(true);
                 preguntando.set(false);
@@ -157,6 +168,41 @@ pub fn follow(track: Signal<Option<Track>>, prefs: Prefs) -> Signal<State> {
     state
 }
 
+/// Si la letra es japonesa, y por tanto lo que toca es la lectura y no la
+/// traduccion: la letra se canta, y sin romaji no hay por donde entrarle.
+///
+/// Basta con que una parte de las lineas lleven kana; una cancion japonesa
+/// tiene versos sueltos en ingles.
+fn en_japones(lyrics: &Lyrics) -> bool {
+    let con_letra = lyrics.lines.iter().filter(|l| !l.text.trim().is_empty()).count();
+    let japonesas = lyrics.lines.iter().filter(|l| crate::translate::is_japanese(&l.text)).count();
+    japonesas * 4 >= con_letra
+}
+
+/// Pone la lectura en romaji bajo cada linea, sin salir de la maquina.
+fn romanizar(state: Signal<State>, lyrics: Lyrics, mine: u64, generation: Rc<Cell<u64>>) {
+    if lyrics.lines.iter().all(|l| l.translation.is_some()) {
+        return;
+    }
+    let originales: Vec<String> = lyrics.lines.iter().map(|l| l.text.clone()).collect();
+    log::info!("romanizando {} lineas aqui mismo", originales.len());
+    chaika::task::spawn(
+        move || crate::romaji::romanize(&originales),
+        move |lecturas| {
+            if generation.get() != mine {
+                return;
+            }
+            let mut lyrics = lyrics;
+            for (line, lectura) in lyrics.lines.iter_mut().zip(lecturas) {
+                if line.translation.is_none() && !lectura.is_empty() {
+                    line.translation = Some(lectura);
+                }
+            }
+            state.set(State::Ready(lyrics));
+        },
+    );
+}
+
 /// Traduce la letra en otro hilo y la mete en su sitio cuando vuelve.
 ///
 /// Va aparte de la busqueda a proposito: la letra tiene que aparecer en
@@ -171,21 +217,9 @@ fn traducir(state: Signal<State>, lyrics: Lyrics, mine: u64, generation: Rc<Cell
     // Queda dicho en el log que la letra sale de esta maquina. Es lo unico
     // que manda texto fuera, y quien lea el log tiene derecho a verlo.
     log::info!("mandando {} lineas a traducir", originales.len());
-    // En japones se ensena la lectura y no la traduccion, que es lo que pide
-    // el caso: la letra se canta, y sin romaji no hay por donde entrarle.
-    // Basta con que unas cuantas lineas lleven kana; una cancion japonesa
-    // tiene versos sueltos en ingles.
-    let japones = originales.iter().filter(|l| crate::translate::is_japanese(l)).count();
-    let en_japones = japones * 4 >= originales.iter().filter(|l| !l.trim().is_empty()).count();
     let idioma = crate::translate::target_language();
     chaika::task::spawn(
-        move || {
-            if en_japones {
-                crate::translate::romanize(&originales)
-            } else {
-                crate::translate::translate_lines(&originales, &idioma)
-            }
-        },
+        move || crate::translate::translate_lines(&originales, &idioma),
         move |result| {
             if generation.get() != mine {
                 return;

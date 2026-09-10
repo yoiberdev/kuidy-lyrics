@@ -34,6 +34,10 @@ pub struct Stored {
     pub show_subs: bool,
     #[serde(rename = "clickThrough")]
     pub click_through: bool,
+    /// Si se puede mandar la letra a traducir. Distinto de `show_subs`:
+    /// uno es permiso y el otro es si se pinta.
+    #[serde(rename = "translationAllowed")]
+    pub translation_allowed: bool,
     /// Si ya se pregunto por la traduccion. Es de kuidy en Rust y no existe
     /// en el archivo de Electron; los archivos viejos no lo llevan y por
     /// eso entran como `false`, que es lo que toca: a esa gente todavia no
@@ -51,12 +55,12 @@ impl Default for Stored {
         Self {
             opacity: 0.95,
             font_scale: 1.0,
-            // Apagada de serie: traducir manda la letra entera a un
-            // servicio de fuera, y eso no se hace sin permiso. La primera
-            // vez que haga falta se pregunta, y lo que se conteste se
-            // queda.
-            show_subs: false,
+            show_subs: true,
             click_through: false,
+            // Traducir manda la letra entera a un servicio de fuera, y eso
+            // no se hace sin permiso. El romaji no pasa por aqui: se hace
+            // en la maquina y no pide nada.
+            translation_allowed: false,
             translation_asked: false,
             window: None,
         }
@@ -74,6 +78,8 @@ pub struct Prefs {
     pub show_subs: Signal<bool>,
     /// Si los clics atraviesan el overlay y llegan a lo que hay debajo.
     pub click_through: Signal<bool>,
+    /// Si se puede mandar la letra a traducir.
+    pub translation_allowed: Signal<bool>,
     /// Si ya se pregunto por la traduccion.
     pub translation_asked: Signal<bool>,
     /// Donde quedo la ventana. Vive aqui y no se relee del disco: antes,
@@ -100,6 +106,7 @@ impl Prefs {
             font_scale: Signal::new(stored.font_scale.clamp(0.8, 1.6)),
             show_subs: Signal::new(stored.show_subs),
             click_through: Signal::new(stored.click_through),
+            translation_allowed: Signal::new(stored.translation_allowed),
             translation_asked: Signal::new(stored.translation_asked),
             window: Signal::new(stored.window),
         };
@@ -114,6 +121,7 @@ impl Prefs {
             font_scale: self.font_scale.get_untracked(),
             show_subs: self.show_subs.get_untracked(),
             click_through: self.click_through.get_untracked(),
+            translation_allowed: self.translation_allowed.get_untracked(),
             translation_asked: self.translation_asked.get_untracked(),
             window: self.window.get_untracked(),
         }
@@ -134,6 +142,7 @@ impl Prefs {
                 prefs.font_scale.get(),
                 prefs.show_subs.get(),
                 prefs.click_through.get(),
+                prefs.translation_allowed.get(),
                 prefs.translation_asked.get(),
             );
             if pending.replace(true) {
@@ -176,9 +185,10 @@ mod tests {
         let d = Stored::default();
         assert_eq!(d.opacity, 0.95);
         assert_eq!(d.font_scale, 1.0);
+        assert!(d.show_subs, "de serie se ensena la linea de abajo");
         assert!(
-            !d.show_subs,
-            "de serie no se traduce: eso manda la letra fuera y nadie lo ha autorizado"
+            !d.translation_allowed,
+            "pero no se traduce: eso manda la letra fuera y nadie lo ha autorizado"
         );
         assert!(!d.translation_asked, "y todavia no se ha preguntado");
         assert!(!d.click_through, "de serie el overlay recibe clics");
@@ -196,7 +206,7 @@ mod tests {
         let s: Stored = serde_json::from_str(viejo).expect("se entiende igual");
         assert_eq!(s.opacity, 0.6, "lo que si estaba se respeta");
         assert_eq!(s.font_scale, 1.2);
-        assert!(!s.show_subs, "y lo que falta toma el valor DE SERIE, no el del tipo");
+        assert!(s.show_subs, "y lo que falta toma el valor DE SERIE, no el del tipo");
         assert!(!s.click_through);
         assert_eq!(s.window, None);
     }
@@ -209,14 +219,15 @@ mod tests {
         let de_antes = r#"{"opacity":0.9,"fontScale":1.0,"showSubs":true,"clickThrough":false}"#;
         let s: Stored = serde_json::from_str(de_antes).expect("se entiende");
         assert!(s.show_subs, "lo que tenia puesto no se le toca");
-        assert!(!s.translation_asked, "pero no consta que se le preguntara");
+        assert!(!s.translation_allowed, "pero traducir no esta autorizado");
+        assert!(!s.translation_asked, "porque no consta que se le preguntara");
     }
 
     #[test]
     fn una_vez_contestado_no_se_vuelve_a_preguntar() {
-        let contestado = r#"{"showSubs":false,"translationAsked":true}"#;
+        let contestado = r#"{"translationAllowed":true,"translationAsked":true}"#;
         let s: Stored = serde_json::from_str(contestado).expect("se entiende");
-        assert!(!s.show_subs);
+        assert!(s.translation_allowed);
         assert!(s.translation_asked);
     }
 
@@ -242,7 +253,7 @@ mod tests {
             serde_json::from_str(r#"{"opacity":0.5}"#).expect("lo que falta se rellena");
         assert_eq!(parcial.opacity, 0.5);
         assert_eq!(parcial.font_scale, 1.0);
-        assert!(!parcial.show_subs, "y el de serie de la traduccion es apagada");
+        assert!(parcial.show_subs, "y lo que falta sale del valor de serie");
 
         // Y con todos menos `window`, que si lo tiene, se lee bien.
         let completo: Stored = serde_json::from_str(

@@ -22,6 +22,7 @@ mod lyrics;
 mod overlay;
 mod playback;
 mod prefs;
+mod romaji;
 mod settings;
 mod store;
 mod translate;

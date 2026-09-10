@@ -119,64 +119,6 @@ pub fn is_japanese(text: &str) -> bool {
     text.chars().any(|c| ('\u{3040}'..='\u{30ff}').contains(&c))
 }
 
-/// Marca los cortes entre lineas. Google romaniza de corrido y se come los
-/// saltos, pero deja pasar lo que no es japones: una arroba sobrevive al otro
-/// lado y sirve de mojon.
-const MOJON: &str = " @@ ";
-
-/// La lectura en romaji de unas lineas en japones.
-///
-/// Es lo que la version de Electron sacaba de kuroshiro con un diccionario de
-/// 17 MB. Aqui sale del mismo endpoint que ya se llama para traducir, asi que
-/// cuesta cero bytes de binario. A cambio, Google acierta las lecturas pero a
-/// veces pega las palabras: "Kiminonaha" donde tocaria "kimi no na wa". Para
-/// cantar encima sirve; para estudiar japones, no.
-pub fn romanize(lines: &[String]) -> Result<Vec<String>, Error> {
-    let mut out = vec![String::new(); lines.len()];
-    let mut pending: Vec<usize> = Vec::new();
-    for (i, line) in lines.iter().enumerate() {
-        if !is_japanese(line) {
-            continue;
-        }
-        match cached("rm", line) {
-            Some(hit) => out[i] = hit,
-            None => pending.push(i),
-        }
-    }
-    if pending.is_empty() {
-        return Ok(out);
-    }
-
-    for group in groups(lines, &pending) {
-        let joined = group.iter().map(|&i| lines[i].as_str()).collect::<Vec<_>>().join(MOJON);
-        let romaji = request_romaji(&joined)?;
-        let parts = split_mojones(&romaji);
-        if parts.len() != group.len() {
-            log::warn!(
-                "romaji descuadrado: {} tramos por {} lineas; se deja sin romanizar",
-                parts.len(),
-                group.len()
-            );
-            continue;
-        }
-        for (&i, part) in group.iter().zip(parts) {
-            remember("rm", &lines[i], &part);
-            out[i] = part;
-        }
-    }
-    Ok(out)
-}
-
-/// Corta por los mojones. Vuelven descosidos — `@@` puede llegar como
-/// `@ @` —, asi que vale cualquier racha de arrobas y espacios.
-fn split_mojones(romaji: &str) -> Vec<String> {
-    romaji
-        .split('@')
-        .map(|p| p.trim().to_string())
-        .filter(|p| !p.is_empty())
-        .collect()
-}
-
 /// Reparte las lineas pendientes en grupos que quepan en una peticion.
 fn groups(lines: &[String], pending: &[usize]) -> Vec<Vec<usize>> {
     let mut out: Vec<Vec<usize>> = Vec::new();
@@ -208,28 +150,16 @@ fn remember(target: &str, text: &str, translation: &str) {
 }
 
 /// Una peticion pidiendo la traduccion.
+///
+/// La llamada va aqui dentro y no en un ayudante aparte porque ya solo hay
+/// una: el romaji dejo de pedirse por aqui cuando paso a hacerse en casa.
 fn request(text: &str, target: &str) -> Result<String, Error> {
     let url = format!(
         "https://translate.googleapis.com/translate_a/single\
          ?client=gtx&sl=auto&tl={target}&dt=t&q={}",
         encode(text)
     );
-    parse(&fetch(&url)?)
-}
-
-/// Una peticion pidiendo solo la romanizacion.
-fn request_romaji(text: &str) -> Result<String, Error> {
-    let url = format!(
-        "https://translate.googleapis.com/translate_a/single\
-         ?client=gtx&sl=ja&tl=en&dt=rm&q={}",
-        encode(text)
-    );
-    parse_romaji(&fetch(&url)?)
-}
-
-/// Pide una URL y devuelve el cuerpo.
-fn fetch(url: &str) -> Result<String, Error> {
-    let response = ureq::get(url)
+    let response = ureq::get(&url)
         .config()
         .timeout_global(Some(Duration::from_secs(15)))
         .build()
@@ -245,28 +175,7 @@ fn fetch(url: &str) -> Result<String, Error> {
         }
         Err(e) => return Err(Error::Service(e.to_string())),
     };
-    Ok(body)
-}
-
-/// El romaji viene en el cuarto hueco de los tramos que no traen traduccion:
-/// `[[[null,null,null,"Kiminonaha tachiagare"]],null,"ja",...]`.
-fn parse_romaji(body: &str) -> Result<String, Error> {
-    let value: serde_json::Value =
-        serde_json::from_str(body).map_err(|e| Error::Service(format!("no es JSON: {e}")))?;
-    let segments = value
-        .get(0)
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| Error::Service("sin tramos".into()))?;
-    let mut out = String::new();
-    for segment in segments {
-        if let Some(text) = segment.get(3).and_then(|v| v.as_str()) {
-            out.push_str(text);
-        }
-    }
-    if out.is_empty() {
-        return Err(Error::Service("sin romanizacion".into()));
-    }
-    Ok(out)
+    parse(&body)
 }
 
 /// La respuesta es un array anidado sin nombres, del estilo:
@@ -369,31 +278,8 @@ mod tests {
         assert!(!is_japanese("just english"));
     }
 
-    #[test]
-    fn los_mojones_se_reconocen_aunque_vuelvan_descosidos() {
-        // Google devuelve "@@" como "@ @" y a veces se come espacios.
-        assert_eq!(
-            split_mojones("Kiminonaha@ @ tachiagare@ @ yume o mite ita"),
-            vec!["Kiminonaha", "tachiagare", "yume o mite ita"]
-        );
-        assert_eq!(split_mojones("uno @@ dos"), vec!["uno", "dos"]);
-        assert_eq!(split_mojones("sin mojones"), vec!["sin mojones"]);
-    }
 
-    #[test]
-    fn lee_el_romaji_del_cuarto_hueco() {
-        let body = r#"[[[null,null,null,"Kiminonaha"]],null,"ja"]"#;
-        assert_eq!(parse_romaji(body).unwrap(), "Kiminonaha");
-        // Una respuesta de traduccion normal no trae romanizacion.
-        assert!(parse_romaji(r#"[[["hola","hello",null,null,10]],null,"en"]"#).is_err());
-    }
 
-    #[test]
-    fn lo_que_no_es_japones_no_se_romaniza() {
-        let lineas = vec!["just english".to_string(), String::new()];
-        // Sin red: si intentara pedir algo, fallaria.
-        assert_eq!(romanize(&lineas).unwrap(), vec!["", ""]);
-    }
 
     #[test]
     fn el_idioma_sale_del_sistema_o_es_espanol() {
@@ -416,54 +302,7 @@ mod red {
     /// El caso que de verdad puede romperse: una letra entera, con sus
     /// grupos, sus lineas vacias y sus versos en ingles por medio. Si los
     /// mojones no aguantan a esta escala, la funcion no sirve para nada.
-    #[test]
-    #[ignore = "necesita internet y un endpoint no oficial"]
-    fn romaniza_una_cancion_entera() {
-        let letra = crate::lrclib::fetch(&crate::lrclib::Query {
-            track: "Yoru ni Kakeru".into(),
-            artist: "YOASOBI".into(),
-            album: String::new(),
-            duration: std::time::Duration::from_secs(261),
-        })
-        .expect("lrclib tiene esta cancion");
-        let lineas: Vec<String> = letra.lines.iter().map(|l| l.text.clone()).collect();
-        let japonesas = lineas.iter().filter(|l| is_japanese(l)).count();
-        println!("{} lineas, {japonesas} en japones", lineas.len());
 
-        let romaji = romanize(&lineas).expect("romanizo");
-        let hechas = romaji.iter().filter(|r| !r.is_empty()).count();
-        for (o, r) in lineas.iter().zip(&romaji).take(8) {
-            println!("  {o}
-    -> {r}");
-        }
-        println!("romanizadas {hechas} de {japonesas}");
-        assert_eq!(
-            hechas, japonesas,
-            "si los mojones no cuadran, romanize abandona el grupo entero y esto baja"
-        );
-    }
-
-    #[test]
-    #[ignore = "necesita internet y un endpoint no oficial"]
-    fn romaniza_de_verdad() {
-        let lineas = vec![
-            "君の名は".to_string(),
-            "立ち上がれ".to_string(),
-            "just english".to_string(),
-            "夢を見ていた".to_string(),
-        ];
-        match romanize(&lineas) {
-            Ok(out) => {
-                for (o, r) in lineas.iter().zip(&out) {
-                    println!("  {o:16} -> {r}");
-                }
-                assert!(!out[0].is_empty(), "la primera es japonesa");
-                assert!(out[2].is_empty(), "el ingles se queda como esta");
-                assert!(!out[3].is_empty());
-            }
-            Err(e) => panic!("no romanizo: {e}"),
-        }
-    }
 
     #[test]
     #[ignore = "necesita internet y un endpoint no oficial"]
