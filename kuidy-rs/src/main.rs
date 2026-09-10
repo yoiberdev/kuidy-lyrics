@@ -310,10 +310,10 @@ fn main() -> Result<(), chaika::platform::Error> {
             // probar la tuberia entera.
             log::info!("demo: {} - {}", track.artists.join(", "), track.name);
             playback.fake(track);
-            fetch::follow(playback.track)
+            fetch::follow(playback.track, prefs)
         } else {
             media::start(playback.clone(), visible);
-            fetch::follow(playback.track)
+            fetch::follow(playback.track, prefs)
         };
 
         Overlay { playback, lyrics, prefs }.view()

@@ -85,7 +85,7 @@ fn view(prefs: Prefs, token: WindowToken) -> Element {
             div()
                 .flex_col()
                 .gap(px(12.))
-                .child(switch_row("Ensenar traduccion", prefs.show_subs))
+                .child(switch_row("Traducir la letra", prefs.show_subs))
                 .child(switch_row("Dejar pasar los clics", prefs.click_through)),
         ))
         .child(

@@ -11,6 +11,7 @@ use chaika::prelude::*;
 use crate::lrclib::{self, Query};
 use crate::lyrics::Lyrics;
 use crate::playback::Track;
+use crate::prefs::Prefs;
 
 /// En que punto esta la busqueda de la letra.
 #[derive(Clone, Debug, PartialEq)]
@@ -51,10 +52,13 @@ impl State {
 /// anterior: si la letra de la cancion vieja llega tarde, se tira. Sin eso,
 /// saltar de tema deja la letra equivocada en pantalla justo cuando el
 /// usuario mas mira.
-pub fn follow(track: Signal<Option<Track>>) -> Signal<State> {
+pub fn follow(track: Signal<Option<Track>>, prefs: Prefs) -> Signal<State> {
     let state = Signal::new(State::Idle);
     // Cada busqueda lleva su numero; solo la ultima tiene derecho a escribir.
     let generation = Rc::new(Cell::new(0_u64));
+    // Una copia para el efecto de la traduccion, que se define despues pero
+    // necesita la misma cuenta de generaciones.
+    let generacion = Rc::clone(&generation);
 
     Effect::new(move || {
         let Some(track) = track.get() else {
@@ -81,12 +85,10 @@ pub fn follow(track: Signal<Option<Track>>) -> Signal<State> {
                     return;
                 }
                 state.set(match result {
-                    Ok(lyrics) => {
-                        // La letra se ensena ya; la traduccion llega despues
-                        // y nunca la retrasa.
-                        traducir(state, lyrics.clone(), mine, Rc::clone(&generation));
-                        State::Ready(lyrics)
-                    }
+                    // La letra se ensena ya. La traduccion la decide el
+                    // efecto de abajo, que ademas mira si el usuario la
+                    // quiere.
+                    Ok(lyrics) => State::Ready(lyrics),
                     Err(e) => {
                         log::info!("sin letra: {e}");
                         State::Missing(mensaje(&e))
@@ -94,6 +96,29 @@ pub fn follow(track: Signal<Option<Track>>) -> Signal<State> {
                 });
             },
         );
+    });
+
+    // La traduccion manda la letra entera a un servicio de fuera, asi que
+    // solo sale si el usuario lo tiene encendido. Y va en un efecto y no
+    // pegada a la busqueda para que encenderlo a mitad de cancion traduzca
+    // la que esta sonando, en vez de la siguiente.
+    let traducida = Rc::new(Cell::new(0_u64));
+    Effect::new(move || {
+        let quiere = prefs.show_subs.get();
+        // Leer el estado aqui suscribe: cuando llega la letra, esto vuelve.
+        let pendiente = state.with(|s| match s {
+            State::Ready(l) if l.lines.iter().any(|x| x.translation.is_none()) => Some(l.clone()),
+            _ => None,
+        });
+        let mine = generacion.get();
+        if !quiere || traducida.get() == mine {
+            return;
+        }
+        let Some(lyrics) = pendiente else { return };
+        // Marcar antes de lanzar: al volver, la traduccion escribe el estado
+        // y este efecto se despierta otra vez.
+        traducida.set(mine);
+        traducir(state, lyrics, mine, Rc::clone(&generacion));
     });
 
     state
@@ -110,6 +135,9 @@ fn traducir(state: Signal<State>, lyrics: Lyrics, mine: u64, generation: Rc<Cell
         return;
     }
     let originales: Vec<String> = lyrics.lines.iter().map(|l| l.text.clone()).collect();
+    // Queda dicho en el log que la letra sale de esta maquina. Es lo unico
+    // que manda texto fuera, y quien lea el log tiene derecho a verlo.
+    log::info!("mandando {} lineas a traducir", originales.len());
     // En japones se ensena la lectura y no la traduccion, que es lo que pide
     // el caso: la letra se canta, y sin romaji no hay por donde entrarle.
     // Basta con que unas cuantas lineas lleven kana; una cancion japonesa
