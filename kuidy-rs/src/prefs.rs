@@ -15,7 +15,17 @@ const FILE: &str = "kuidy-prefs.json";
 
 /// Lo que se guarda en disco. Los mismos nombres que el kuidy de Electron,
 /// para poder mirar los dos archivos y compararlos.
+///
+/// El `default` va en el contenedor y no campo a campo, y la diferencia
+/// importa: campo a campo, un archivo al que le falte `opacity` se leeria
+/// como `0.0` -- el `Default` del f32 -- en vez de como `0.95`, que es el
+/// valor de serie de verdad. En el contenedor, lo que falte sale de
+/// `Stored::default()`.
+///
+/// Sin esto, anadir un ajuste nuevo hace que el archivo de quien actualice
+/// deje de entenderse entero y pierda todo lo que tenia puesto.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Stored {
     pub opacity: f32,
     #[serde(rename = "fontScale")]
@@ -53,6 +63,10 @@ pub struct Prefs {
     pub show_subs: Signal<bool>,
     /// Si los clics atraviesan el overlay y llegan a lo que hay debajo.
     pub click_through: Signal<bool>,
+    /// Donde quedo la ventana. Vive aqui y no se relee del disco: antes,
+    /// cada guardado abria y parseaba el archivo solo para recuperar este
+    /// campo, y encima desde el hilo de la interfaz.
+    pub window: Signal<Option<(f32, f32)>>,
 }
 
 impl Prefs {
@@ -73,6 +87,7 @@ impl Prefs {
             font_scale: Signal::new(stored.font_scale.clamp(0.8, 1.6)),
             show_subs: Signal::new(stored.show_subs),
             click_through: Signal::new(stored.click_through),
+            window: Signal::new(stored.window),
         };
         prefs.save_on_change();
         prefs
@@ -85,9 +100,7 @@ impl Prefs {
             font_scale: self.font_scale.get_untracked(),
             show_subs: self.show_subs.get_untracked(),
             click_through: self.click_through.get_untracked(),
-            window: crate::store::read(FILE)
-                .and_then(|j| serde_json::from_str::<Stored>(&j).ok())
-                .and_then(|s| s.window),
+            window: self.window.get_untracked(),
         }
     }
 
@@ -133,17 +146,8 @@ impl Prefs {
 
     /// Guarda donde quedo la ventana.
     pub fn save_window(&self, x: f32, y: f32) {
-        let mut stored = self.snapshot();
-        stored.window = Some((x, y));
-        if let Ok(json) = serde_json::to_string_pretty(&stored) {
-            let _ = crate::store::write(FILE, &json);
-        }
-    }
-
-    /// Donde estaba la ventana la ultima vez.
-    pub fn window() -> Option<(f32, f32)> {
-        let json = crate::store::read(FILE)?;
-        serde_json::from_str::<Stored>(&json).ok()?.window
+        self.window.set(Some((x, y)));
+        self.save_now();
     }
 }
 
@@ -160,6 +164,30 @@ mod tests {
         assert!(!d.click_through, "de serie el overlay recibe clics");
     }
 
+    /// La prueba que protege los ajustes de quien actualiza.
+    ///
+    /// Cuando se anade un campo nuevo a `Stored`, el archivo que ya tiene el
+    /// usuario no lo lleva. Sin `#[serde(default)]` en el contenedor, ese
+    /// archivo deja de entenderse ENTERO y el usuario pierde todo lo que
+    /// tenia puesto sin enterarse.
+    #[test]
+    fn un_archivo_al_que_le_falten_campos_no_borra_el_resto() {
+        let viejo = r#"{"opacity":0.6,"fontScale":1.2}"#;
+        let s: Stored = serde_json::from_str(viejo).expect("se entiende igual");
+        assert_eq!(s.opacity, 0.6, "lo que si estaba se respeta");
+        assert_eq!(s.font_scale, 1.2);
+        assert!(s.show_subs, "y lo que falta toma el valor DE SERIE, no el del tipo");
+        assert!(!s.click_through);
+        assert_eq!(s.window, None);
+    }
+
+    #[test]
+    fn un_archivo_vacio_da_los_valores_de_serie() {
+        let s: Stored = serde_json::from_str("{}").expect("se entiende");
+        assert_eq!(s, Stored::default());
+        assert_eq!(s.opacity, 0.95, "no 0.0, que es lo que daria un default por campo");
+    }
+
     #[test]
     fn se_guarda_con_los_nombres_que_usa_electron() {
         let json = serde_json::to_string(&Stored::default()).unwrap();
@@ -171,8 +199,11 @@ mod tests {
     #[test]
     fn un_archivo_de_ajustes_a_medias_no_tira_los_demas() {
         // Falta todo menos la opacidad: el resto sale de los valores de serie.
-        let parsed: Result<Stored, _> = serde_json::from_str(r#"{"opacity":0.5}"#);
-        assert!(parsed.is_err(), "serde exige los campos sin default");
+        let parcial: Stored =
+            serde_json::from_str(r#"{"opacity":0.5}"#).expect("lo que falta se rellena");
+        assert_eq!(parcial.opacity, 0.5);
+        assert_eq!(parcial.font_scale, 1.0);
+        assert!(parcial.show_subs);
 
         // Y con todos menos `window`, que si lo tiene, se lee bien.
         let completo: Stored = serde_json::from_str(

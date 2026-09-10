@@ -11,6 +11,14 @@ use std::path::PathBuf;
 
 /// La carpeta de datos de la app, creada si no existe.
 pub fn dir() -> io::Result<PathBuf> {
+    // Una salida para las pruebas y para quien quiera una instalacion
+    // portatil. Sin esto, `cargo test` escribe en los ajustes de verdad del
+    // usuario, y con kuidy abierto puede pisarselos.
+    if let Some(propia) = std::env::var_os("KUIDY_DIR") {
+        let dir = PathBuf::from(propia);
+        std::fs::create_dir_all(&dir)?;
+        return Ok(dir);
+    }
     let base = std::env::var_os("APPDATA")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
