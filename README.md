@@ -13,8 +13,9 @@ Overlay flotante de letras de Spotify para Windows. Ventana transparente, siempr
 > **[Descargar el .exe](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.2.0)**
 > · el codigo y sus instrucciones estan en [`kuidy-rs/`](kuidy-rs/)
 >
-> Solo hay build de Windows. Lo de abajo describe la version de Electron,
-> que sigue siendo la estable.
+> Pide **Windows 10 1809 o posterior**; probado en Windows 11.
+>
+> Lo de abajo describe la version de Electron, que sigue siendo la estable.
 
 > **¿Solo quieres usar la app?** Este README es la documentación de desarrollo. Si has recibido un instalador `.exe`, lo tuyo es **[BETA.md](BETA.md)**: instalación, cómo crear tu app de Spotify y cómo reportar fallos.
 

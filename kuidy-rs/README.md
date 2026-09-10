@@ -70,6 +70,23 @@ Como en release no hay consola, **la unica traza es el log a disco**. Si algo
 va mal en el binario publicado y no en `cargo run`, el archivo de log es el
 sitio donde mirar.
 
+## Que hace falta
+
+**Windows 10 version 1809 (10.0.17763) o posterior**, que es cuando aparecio
+`Windows.Media.Control`, de donde kuidy saca lo que suena. Probado solo en
+Windows 11; en 10 deberia ir, pero nadie lo ha comprobado.
+
+No hay version de Linux ni de macOS. La parte de kuidy que ata a un sistema
+es **un solo archivo**, `media.rs`: en Linux lo equivalente es MPRIS
+(`org.mpris.MediaPlayer2`) sobre D-Bus, que Spotify implementa y que da los
+mismos datos, asi que seria escribir ese `leer()` y devolver la misma
+`Foto`. En macOS no hay API publica para esto y habria que volver a la API
+de Spotify, con la cuenta de desarrollador que eso arrastra.
+
+El resto del programa no sabe en que sistema esta. Lo que si esta sin probar
+fuera de Windows es [chaika](https://github.com/yoiberdev/chaika), que lleva
+los `cfg` de las otras plataformas pero nadie ha compilado alli.
+
 ## De donde sale lo que suena
 
 De **Windows**, no de Spotify. El sistema lleva un registro de lo que

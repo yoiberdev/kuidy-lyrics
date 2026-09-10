@@ -10,11 +10,25 @@
 //! cinco usuarios que Spotify impone a las apps en Development Mode. Y de
 //! propina funciona con cualquier reproductor, no solo con Spotify.
 //!
+//! Es lo unico de kuidy atado a un sistema operativo concreto. El resto no
+//! lo esta, asi que si algun dia hay version de Linux, el trabajo es este
+//! archivo y nada mas: alli lo mismo se pide por MPRIS
+//! (`org.mpris.MediaPlayer2`) sobre D-Bus, que Spotify implementa y que da
+//! los mismos datos. macOS es el dificil: no hay API publica para esto.
+//!
+//! Pide Windows 10 version 1809 (10.0.17763), que es cuando aparecio
+//! `Windows.Media.Control`.
+//!
 //! El precio es que la posicion no es un cronometro: Windows publica una
 //! foto (`Position`) con la hora a la que se tomo (`LastUpdatedTime`), y
 //! Spotify solo la refresca cada dos segundos largos. La posicion de verdad
 //! se calcula sumando lo que ha pasado desde esa hora. Medido contra el
 //! reloj, esa cuenta no se desvia ni un milisegundo.
+
+#[cfg(not(windows))]
+compile_error!(
+    "kuidy solo sabe leer lo que suena en Windows. El equivalente en Linux es      MPRIS (org.mpris.MediaPlayer2) sobre D-Bus; hay que escribir ese `leer()`      y devolver la misma `Foto`."
+);
 
 use std::cell::Cell;
 use std::rc::Rc;
