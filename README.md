@@ -10,7 +10,7 @@ Overlay flotante de letras de Spotify para Windows. Ventana transparente, siempr
 > asi que **no hay nada que conectar**: se abre y funciona, con cualquier
 > reproductor.
 >
-> **[Descargar el .exe](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.2.0)**
+> **[Descargar el .exe](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.2.1)**
 > · el codigo y sus instrucciones estan en [`kuidy-rs/`](kuidy-rs/)
 >
 > Pide **Windows 10 1809 o posterior**; probado en Windows 11.
