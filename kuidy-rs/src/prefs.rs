@@ -179,11 +179,6 @@ impl Prefs {
         }
     }
 
-    /// Guarda donde quedo la ventana.
-    pub fn save_window(&self, x: f32, y: f32) {
-        self.window.set(Some((x, y)));
-        self.save_now();
-    }
 }
 
 #[cfg(test)]

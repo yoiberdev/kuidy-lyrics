@@ -185,7 +185,7 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
         "logs" => match log_file::dir() {
             Some(dir) => {
                 log::info!("abriendo la carpeta de logs: {}", dir.display());
-                if let Err(e) = open::that_detached(&dir) {
+                if let Err(e) = app::open_url(&dir.to_string_lossy()) {
                     log::warn!("no se pudo abrir la carpeta de logs: {e}");
                 }
             }
@@ -232,27 +232,28 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
         }
     }
 }
-
-/// Guarda donde esta la ventana para que el proximo arranque la ponga ahi.
+/// Recuerda donde deja el usuario la ventana.
 ///
-/// APANO(chaika#7): chaika no avisa cuando la ventana se mueve — no hay un
-/// `Event::Moved` —, asi que no queda otra que mirar cada tanto. Un vistazo
-/// cada dos segundos no se nota y solo escribe cuando de verdad cambio.
+/// Escribe con retraso a proposito: `Moved` llega en cada paso del arrastre,
+/// y guardar el disco a ese ritmo por mover una ventana es absurdo. Se
+/// espera a que la mano pare.
 fn recordar_posicion(prefs: Prefs) {
-    fn vigilar(prefs: Prefs, ultima: Option<(f32, f32)>) {
-        chaika::task::after(std::time::Duration::from_secs(2), move || {
-            let ahora = app::window(WindowToken::MAIN)
-                .map(|w| w.position())
-                .map(|p| (p.x.get(), p.y.get()));
-            if let Some(pos) = ahora {
-                if ultima != Some(pos) {
-                    prefs.save_window(pos.0, pos.1);
-                }
-            }
-            vigilar(prefs, ahora);
+    let pendiente = std::rc::Rc::new(std::cell::Cell::new(false));
+    app::on_window_event(move |token, event| {
+        if token != WindowToken::MAIN {
+            return;
+        }
+        let chaika::platform::Event::Moved(p) = event else { return };
+        prefs.window.set(Some((p.x.get(), p.y.get())));
+        if pendiente.replace(true) {
+            return;
+        }
+        let pendiente = std::rc::Rc::clone(&pendiente);
+        chaika::task::after(std::time::Duration::from_millis(600), move || {
+            pendiente.set(false);
+            prefs.save_now();
         });
-    }
-    vigilar(prefs, None);
+    });
 }
 
 /// La cancion de mentira con la que arrancar sin cuenta de Spotify.
@@ -302,6 +303,10 @@ fn main() -> Result<(), chaika::platform::Error> {
             always_on_top: true,
             skip_taskbar: true,
             resizable: true,
+            // Sin esto se puede encoger arrastrando el borde hasta que no se
+            // ve, y entonces no hay de donde volver a agarrarla: no tiene
+            // marco ni sale en la barra de tareas.
+            min_size: Some(size(px(220.), px(120.))),
             // Oculta hasta colocarla sobre el area util.
             visible: false,
             ..Default::default()

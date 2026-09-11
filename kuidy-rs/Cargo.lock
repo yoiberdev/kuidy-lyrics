@@ -776,6 +776,7 @@ dependencies = [
  "chaika-render",
  "chaika-text",
  "log",
+ "open",
  "rfd",
 ]
 
@@ -2314,7 +2315,6 @@ dependencies = [
  "chaika",
  "env_logger",
  "log",
- "open",
  "resvg",
  "ruzstd",
  "serde",

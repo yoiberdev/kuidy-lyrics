@@ -71,7 +71,7 @@ pub fn abrir() {
     match escribir() {
         Ok(ruta) => {
             log::info!("avisos de terceros en {}", ruta.display());
-            if let Err(e) = open::that_detached(&ruta) {
+            if let Err(e) = chaika::app::open_url(&ruta.to_string_lossy()) {
                 log::warn!("no se pudieron abrir los avisos: {e}");
             }
         }
