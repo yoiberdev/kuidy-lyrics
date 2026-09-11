@@ -81,10 +81,10 @@ impl Overlay {
                 div()
                     .flex_1()
                     .w_full()
-                    // APANO(chaika#3): `overflow_scroll` dibuja siempre su
-                    // barra, y en un overlay sobra. `overflow_clip` no la
-                    // dibuja y el ScrollHandle sigue moviendolo igual.
-                    .overflow_clip()
+                    // Se desplaza pero sin barra: en un overlay sin marco
+                    // sobre el escritorio, la barra se ve como una linea
+                    // clara pegada al borde y no pinta nada.
+                    .overflow_scroll_hidden()
                     .scroll_handle(lista)
                     .flex_col()
                     .items_center()
