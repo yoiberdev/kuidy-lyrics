@@ -88,6 +88,11 @@ impl Overlay {
                     .scroll_handle(lista)
                     .flex_col()
                     .items_center()
+                    // Pocas lineas (o el aviso) van al centro; una letra
+                    // entera empieza arriba. Es lo que hace `justify_center`
+                    // en una caja con scroll desde chaika#5: antes dejaba
+                    // las primeras lineas por encima del borde.
+                    .justify_center()
                     .px(px(16.))
                     .py(px(60.))
                     .gap(px(10.))
@@ -102,20 +107,11 @@ impl Overlay {
                         Fila::clave,
                         move |fila| match fila {
                             Fila::Linea(i) => linea(*i, lyrics, actual, prefs),
-                            // El aviso ocupa el hueco y se centra el solo.
-                            // Centrar el contenedor entero (`justify_center`)
-                            // dejaria las primeras lineas por encima del
-                            // borde, donde el scroll no llega. Ver chaika#5.
-                            Fila::Aviso(m) => div()
-                                .flex_1()
-                                .w_full()
-                                .items_center()
-                                .justify_center()
-                                .child(
-                                    text(m.clone())
-                                        .text_size(px(13.))
-                                        .color(Color::rgba8(255, 255, 255, 150)),
-                                ),
+                            // El aviso lo centra la lista, como a cualquier
+                            // otra fila.
+                            Fila::Aviso(m) => text(m.clone())
+                                .text_size(px(13.))
+                                .color(Color::rgba8(255, 255, 255, 150)),
                         },
                     ),
             )
