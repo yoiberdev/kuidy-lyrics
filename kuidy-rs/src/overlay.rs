@@ -186,11 +186,7 @@ fn cabecera(playback: &Playback, minimal: Signal<bool>) -> Element {
                 ),
         )
         .child(
-            // APANO(chaika#1): derive de un literal da Prop<&str>, que no
-            // convierte a Prop<String>; hay que pasar por String a mano.
-            text(derive(move || {
-                if playing.get() { String::new() } else { "PAUSA".to_string() }
-            }))
+            text(derive(move || if playing.get() { "" } else { "PAUSA" }))
                 .text_size(px(9.))
                 .color(Color::rgba8(255, 255, 255, 180)),
         )
