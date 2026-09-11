@@ -10,7 +10,7 @@ Overlay flotante de letras de Spotify para Windows. Ventana transparente, siempr
 > nada que conectar**: se abre y funciona, con cualquier reproductor. Y el
 > romaji de las canciones japonesas se hace en tu equipo, sin internet.
 >
-> **[Descargar el .exe](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.3.0)**
+> **[Descargar el .exe](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.4.0)**
 > · el codigo y sus instrucciones estan en [`kuidy-rs/`](kuidy-rs/)
 >
 > Pide **Windows 10 1809 o posterior**; probado en Windows 11.
