@@ -13,6 +13,7 @@
 // release ya estan en el archivo, que para eso se hizo.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod avisos;
 mod fetch;
 mod log_file;
 mod media;
@@ -127,6 +128,10 @@ fn menu_bandeja(visible: bool, minimal: bool) -> Vec<MenuEntry> {
         // Quien reporte un fallo tiene que poder mandar el log sin ir a
         // buscar %APPDATA% a mano.
         MenuEntry::item("logs", "Abrir carpeta de logs"),
+        // La licencia del diccionario japones obliga a que su aviso
+        // acompane al programa, y kuidy se reparte como un .exe suelto: sin
+        // esto, quien solo se baja el ejecutable no lo recibe.
+        MenuEntry::item("avisos", "Avisos de terceros"),
         MenuEntry::separator(),
         MenuEntry::item("version", concat!("kuidy v", env!("CARGO_PKG_VERSION"))).disabled(),
         MenuEntry::item("salir", "Salir"),
@@ -176,6 +181,7 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
         "toggle" => alternar(),
         "minimal" => alternar_minimal(),
         "ajustes" => settings::open(prefs, ajustes),
+        "avisos" => avisos::abrir(),
         "logs" => match log_file::dir() {
             Some(dir) => {
                 log::info!("abriendo la carpeta de logs: {}", dir.display());
