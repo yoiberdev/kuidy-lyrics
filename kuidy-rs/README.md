@@ -205,8 +205,8 @@ rectas, porque ladeadas salen en punta y parece un gato.
 
 | Sale | De | Donde se ve |
 |---|---|---|
-| `bandeja.rgba` 16px | la cabeza sola | la bandeja del sistema |
-| `ventana.rgba` 64px | el completo | barra de titulo, barra de tareas, Alt+Tab |
+| `bandeja.rgba` 16px | la cabeza sola | la bandeja del sistema y la barra de titulo |
+| `ventana.rgba` 64px | el completo | barra de tareas, Alt+Tab |
 | `kuidy.ico` 16/32/48/256 | los dos | el `.exe` en el explorador |
 
 El `.ico` mezcla los dos: el de 16 sale de la cabeza y el resto del peluche
@@ -218,6 +218,7 @@ rehace en cada compilacion, el icono no puede quedarse desfasado del
 dibujo. El encuadre tambien es automatico -- se mide donde cae la tinta, no
 el viewBox -- asi que retocar el SVG no obliga a recentrar nada.
 
-Lo que no tiene arreglo desde aqui es que la barra de titulo y la barra de
-tareas quieren 16 y 32 a la vez, y chaika solo acepta un tamano por
-ventana: [chaika#8](https://github.com/yoiberdev/chaika/issues/8).
+La barra de titulo y la barra de tareas quieren 16 y 32 a la vez, y la
+ventana acepta los dos desde [chaika#8](https://github.com/yoiberdev/chaika/issues/8):
+el pequeno es la misma cabeza que va en la bandeja, que reducida del
+grande se convertia en barro.
