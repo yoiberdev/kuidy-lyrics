@@ -100,11 +100,13 @@ fn icono(bytes: &[u8]) -> Icon {
 
 /// El icono de la bandeja: la version simplificada, que es la que aguanta
 /// a 16 pixeles.
-fn tray_icon() -> Icon {
+pub fn tray_icon() -> Icon {
     icono(include_bytes!(concat!(env!("OUT_DIR"), "/bandeja.rgba")))
 }
 
-/// El de la ventana, que sale en la barra de tareas y al hacer Alt+Tab.
+/// El grande de la ventana, que sale en la barra de tareas y al hacer
+/// Alt+Tab. El pequeno de la barra de titulo es el mismo que el de la
+/// bandeja: a 16 px hace falta el dibujo simplificado, no este reducido.
 pub fn window_icon() -> Icon {
     icono(include_bytes!(concat!(env!("OUT_DIR"), "/ventana.rgba")))
 }
@@ -295,7 +297,8 @@ fn main() -> Result<(), chaika::platform::Error> {
     let options = AppOptions {
         window: WindowOptions {
             title: "kuidy".into(),
-            icon: Some(window_icon()),
+            icon: Some(tray_icon()),
+            icon_large: Some(window_icon()),
             // Lo mismo que el overlay de Electron.
             size: size(px(420.), px(320.)),
             transparent: true,

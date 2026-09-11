@@ -66,7 +66,10 @@ pub fn open(prefs: Prefs, abierto: Signal<Option<WindowToken>>) {
     let options = AppOptions {
         window: WindowOptions {
             title: "kuidy — ajustes".into(),
-            icon: Some(crate::window_icon()),
+            // El de 16 para la barra de titulo y el de 64 para la barra de
+            // tareas: reducir el grande a 16 lo dejaba borroso (chaika#8).
+            icon: Some(crate::tray_icon()),
+            icon_large: Some(crate::window_icon()),
             size: size(px(360.), px(ALTO)),
             transparent: false,
             decorations: true,
