@@ -80,10 +80,6 @@ impl Overlay {
             .child(
                 div()
                     .flex_1()
-                    // APANO(chaika#2): sin esto el contenedor crece hasta el
-                    // tamano de su contenido (609px en una ventana de 320) y
-                    // no queda nada que desplazar.
-                    .min_h(px(0.))
                     .w_full()
                     // APANO(chaika#3): `overflow_scroll` dibuja siempre su
                     // barra, y en un overlay sobra. `overflow_clip` no la
