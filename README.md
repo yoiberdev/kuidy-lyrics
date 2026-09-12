@@ -144,6 +144,16 @@ El instalador **no** está firmado, así que SmartScreen avisará al ejecutarlo.
 - La cuenta que autorizas en Kuidy debe ser **la misma** en la que suena la música; si el overlay dice "no se está reproduciendo nada" con música sonando, revisa con qué cuenta está logueado tu reproductor.
 - Si Spotify devuelve **403**, asegúrate de haber añadido tu email en *Settings → User Management* en el dashboard.
 
+## ☕ Apoya el proyecto
+
+Kuidy Lyrics es y seguirá siendo software libre y gratuito (licencia MIT). Si la aplicación te gusta, te resulta útil o te acompaña mientras juegas o escuchas música, puedes invitarme un café para apoyar el desarrollo continuo y el mantenimiento:
+
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Invítame_un_café-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/yoiberdev)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Apoyar-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/yoiber)
+
+- **[Ko-fi (ko-fi.com/yoiberdev)](https://ko-fi.com/yoiberdev)** — Pagos con tarjeta, PayPal o Google Pay (0% comisiones).
+- **[Buy Me a Coffee (buymeacoffee.com/yoiber)](https://buymeacoffee.com/yoiber)** — Donaciones directas.
+
 ## Licencia
 
 Kuidy Lyrics es MIT — ver [LICENSE](LICENSE). Las licencias y atribuciones de las dependencias, de las letras de LRCLIB y el aviso sobre Spotify están en [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

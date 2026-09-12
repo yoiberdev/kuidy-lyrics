@@ -210,7 +210,13 @@ function registerIpc() {
   // usuario al dashboard de Spotify. Solo https, y solo a los dominios que la
   // propia app enseña: un openExternal abierto sería una primitiva de ejecución
   // regalada a cualquiera que llegara a inyectar algo en el renderer.
-  const EXTERNAL_ALLOWED = new Set(['developer.spotify.com', 'lrclib.net', 'github.com']);
+  const EXTERNAL_ALLOWED = new Set([
+    'developer.spotify.com',
+    'lrclib.net',
+    'github.com',
+    'ko-fi.com',
+    'buymeacoffee.com',
+  ]);
   handle('app:openExternal', async (_e, url) => {
     let parsed;
     try {
