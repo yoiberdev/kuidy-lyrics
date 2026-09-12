@@ -34,19 +34,6 @@ function rebuildTrayMenu() {
       },
     },
     { type: 'separator' },
-    {
-      label: '☕ Invitar un café (Ko-fi)',
-      click: () => {
-        require('electron').shell.openExternal('https://ko-fi.com/yoiberdev');
-      },
-    },
-    {
-      label: '💛 Donar en Buy Me a Coffee',
-      click: () => {
-        require('electron').shell.openExternal('https://buymeacoffee.com/yoiber');
-      },
-    },
-    { type: 'separator' },
     // Entrada informativa: al reportar un fallo, lo primero que necesitamos
     // saber es qué build tiene instalada.
     { label: versionLabel, enabled: false },

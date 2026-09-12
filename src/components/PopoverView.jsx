@@ -468,18 +468,6 @@ export default function PopoverView() {
               <span className="text-[13px] text-white/30 shrink-0">›</span>
             </Row>
 
-            <Row onClick={() => window.kuidy.openExternal('https://ko-fi.com/yoiberdev')}>
-              <div className="flex flex-col min-w-0">
-                <span className="text-[12px] font-medium text-amber-300/90 flex items-center gap-1.5">
-                  ☕ Invítame un café
-                </span>
-                <span className="text-[10px] text-white/40">
-                  Apoya el desarrollo en Ko-fi o Buy Me a Coffee
-                </span>
-              </div>
-              <span className="text-[13px] text-amber-300/60 shrink-0">›</span>
-            </Row>
-
             <div className="px-3 pt-3 pb-1">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[11px] font-medium text-white/80">Tamaño de letra</span>

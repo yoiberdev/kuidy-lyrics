@@ -1,5 +1,8 @@
 # kuidy (Rust)
 
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Invítame_un_café-F16061?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/yoiberdev)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Apoyar-ffdd00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/yoiber)
+
 kuidy-lyrics reescrito sobre [chaika](https://github.com/yoiberdev/chaika),
 sin Electron.
 
@@ -222,3 +225,11 @@ La barra de titulo y la barra de tareas quieren 16 y 32 a la vez, y la
 ventana acepta los dos desde [chaika#8](https://github.com/yoiberdev/chaika/issues/8):
 el pequeno es la misma cabeza que va en la bandeja, que reducida del
 grande se convertia en barro.
+
+## ☕ Apoyar el proyecto
+
+kuidy es y seguirá siendo software libre y gratuito (licencia MIT), sin anuncios ni telemetría. Si la aplicación te resulta útil, te acompaña mientras juegas o escuchas música, o simplemente quieres apoyar el trabajo de reescribirla en Rust de forma nativa:
+
+- **[Ko-fi (ko-fi.com/yoiberdev)](https://ko-fi.com/yoiberdev)** — Pagos con tarjeta, PayPal o Google Pay (0% comisiones).
+- **[Buy Me a Coffee (buymeacoffee.com/yoiber)](https://buymeacoffee.com/yoiber)** — Donaciones directas.
+

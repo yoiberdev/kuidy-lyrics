@@ -135,6 +135,9 @@ fn menu_bandeja(visible: bool, minimal: bool) -> Vec<MenuEntry> {
         // esto, quien solo se baja el ejecutable no lo recibe.
         MenuEntry::item("avisos", "Avisos de terceros"),
         MenuEntry::separator(),
+        MenuEntry::item("kofi", "☕ Invitar un cafe (Ko-fi)"),
+        MenuEntry::item("buymeacoffee", "💛 Buy Me a Coffee"),
+        MenuEntry::separator(),
         MenuEntry::item("version", concat!("kuidy v", env!("CARGO_PKG_VERSION"))).disabled(),
         MenuEntry::item("salir", "Salir"),
     ]
@@ -193,6 +196,18 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
             }
             None => log::warn!("no hay carpeta de logs que abrir"),
         },
+        "kofi" => {
+            log::info!("abriendo enlace de Ko-fi");
+            if let Err(e) = app::open_url("https://ko-fi.com/yoiberdev") {
+                log::warn!("no se pudo abrir enlace de Ko-fi: {e}");
+            }
+        }
+        "buymeacoffee" => {
+            log::info!("abriendo enlace de Buy Me a Coffee");
+            if let Err(e) = app::open_url("https://buymeacoffee.com/yoiber") {
+                log::warn!("no se pudo abrir enlace de Buy Me a Coffee: {e}");
+            }
+        }
         "salir" => {
             // Los ajustes van en ventana aparte: si se quedan abiertos, la
             // app sigue viva sin overlay y sin forma de recuperarlo.

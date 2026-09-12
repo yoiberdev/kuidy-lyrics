@@ -1,21 +1,23 @@
 # Kuidy Lyrics
 
-Overlay flotante de letras de Spotify para Windows. Ventana transparente, siempre al frente (incluso encima de juegos en *borderless fullscreen*), con UI minimalista y letras **sincronizadas** que se resaltan línea a línea con la canción.
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Invítame_un_café-F16061?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/yoiberdev)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Apoyar-ffdd00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/yoiber)
 
-> ### Hay una version en Rust, y ya no pide cuenta de desarrollador
+Overlay flotante de letras sincronizadas para Windows. Ventana transparente, siempre al frente (incluso encima de juegos en *borderless fullscreen*), con UI minimalista y letras que se resaltan línea a línea con la música.
+
+> ### ⭐ Versión principal recomendada: Kuidy en Rust (`kuidy-rs`)
 >
-> Kuidy se ha reescrito desde cero en Rust, sin Electron y sin navegador
-> dentro: **20 MB en vez de 392**, un proceso en vez de cinco. Le pregunta a
-> **Windows** que suena en lugar de a la API de Spotify, asi que **no hay
-> nada que conectar**: se abre y funciona, con cualquier reproductor. Y el
-> romaji de las canciones japonesas se hace en tu equipo, sin internet.
+> Kuidy se ha reescrito desde cero en **Rust** (sobre [chaika](https://github.com/yoiberdev/chaika)), **sin Electron y sin navegador dentro**:
+> **20 MB en vez de 392 MB**, un único proceso en vez de cinco, inicio instantáneo.
 >
-> **[Descargar el .exe](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.4.0)**
-> · el codigo y sus instrucciones estan en [`kuidy-rs/`](kuidy-rs/)
+> Le pregunta directamente a **Windows** qué está sonando (vía `Windows.Media.Control`) en lugar de a la API de Spotify, así que **no hay nada que conectar ni configurar**: se abre y funciona al instante con Spotify o cualquier otro reproductor. Además, la lectura en romaji para canciones en japonés se procesa **en local y 100% offline**.
 >
-> Pide **Windows 10 1809 o posterior**; probado en Windows 11.
+> 🚀 **[Descargar ejecutable nativo (.exe)](https://github.com/yoiberdev/kuidy-lyrics/releases/tag/rs-v0.4.0)**
+> · Código fuente y documentación: [`kuidy-rs/`](kuidy-rs/)
 >
-> Lo de abajo describe la version de Electron, que sigue siendo la estable.
+> *Requisitos: Windows 10 (1809+) o Windows 11.*
+>
+> *(Nota: Lo que figura a continuación documenta la versión previa en Electron/React).*
 
 > **¿Solo quieres usar la app?** Este README es la documentación de desarrollo. Si has recibido un instalador `.exe`, lo tuyo es **[BETA.md](BETA.md)**: instalación, cómo crear tu app de Spotify y cómo reportar fallos.
 
@@ -146,7 +148,7 @@ El instalador **no** está firmado, así que SmartScreen avisará al ejecutarlo.
 
 ## ☕ Apoya el proyecto
 
-Kuidy Lyrics es y seguirá siendo software libre y gratuito (licencia MIT). Si la aplicación te gusta, te resulta útil o te acompaña mientras juegas o escuchas música, puedes invitarme un café para apoyar el desarrollo continuo y el mantenimiento:
+Kuidy (y su nueva versión nativa en Rust, [`kuidy-rs`](kuidy-rs/)) es y seguirá siendo software libre y gratuito (licencia MIT), sin telemetría ni anuncios. Si la aplicación te resulta útil, te acompaña mientras juegas o escuchas música, o valoras el trabajo de reescribirla en Rust para que no consuma recursos, puedes invitarme un café:
 
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Invítame_un_café-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/yoiberdev)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Apoyar-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/yoiber)
