@@ -73,6 +73,37 @@ Como en release no hay consola, **la unica traza es el log a disco**. Si algo
 va mal en el binario publicado y no en `cargo run`, el archivo de log es el
 sitio donde mirar.
 
+### El instalador MSI
+
+El `.exe` suelto funciona, pero no deja acceso en el menu Inicio ni forma de
+desinstalar, y no hay donde mirar que version hay puesta. Para eso esta el
+MSI, que se construye con [cargo-wix](https://github.com/volks73/cargo-wix):
+
+```sh
+cargo install cargo-wix        # una vez
+cargo wix                      # queda en target/wix/kuidy-<version>-x86_64.msi
+```
+
+Hace falta ademas el **WiX Toolset 3.14**, que trae `candle.exe` y
+`light.exe`. Su instalador pide administrador y arrastra .NET Framework 3.5:
+
+```sh
+winget install --id WiXToolset.WiXToolset --exact
+```
+
+La configuracion esta en [`wix/main.wxs`](wix/main.wxs), reescrita sobre lo
+que genera `cargo wix init` porque aquella plantilla es para una herramienta
+de terminal. Las diferencias y el porque estan comentados en el archivo; en
+corto: se instala **por usuario** en `%LOCALAPPDATA%\Programs\kuidy` y por eso
+no pide administrador, deja acceso en el menu Inicio, y no toca el PATH.
+
+El `UpgradeCode` del `.wxs` **no se cambia nunca**. Es lo unico por lo que
+Windows sabe que una version sustituye a la anterior en vez de instalarse a su
+lado.
+
+Como el `.exe`, el MSI **no esta firmado**: Windows seguira avisando al
+abrirlo.
+
 ## Que hace falta
 
 **Windows 10 version 1809 (10.0.17763) o posterior**, que es cuando aparecio
@@ -100,8 +131,16 @@ necesita: titulo, artista, album, duracion, posicion y si suena o no.
 Eso quita de en medio la cuenta de desarrollador, el Client ID, el OAuth,
 la cuota y el limite de cinco usuarios que Spotify impone a las apps en
 Development Mode. **No hay nada que conectar**: se abre y funciona. Y de
-propina sirve para cualquier reproductor, no solo para Spotify; si hay
-varios sonando, gana Spotify.
+propina sirve para cualquier reproductor, no solo para Spotify.
+
+Con varios a la vez manda **el que este sonando**, y solo entre iguales gana
+Spotify. El orden importa mas de lo que parece: Windows llama "sesion actual"
+a la del ultimo programa con el que interactuaste, que no tiene por que ser
+el que suena. Fiarse de eso hacia que poner un video en el navegador y luego
+tocar otra ventana dejara a kuidy mirando a un programa mudo, y por fuera se
+veia como que dejaba de detectar la cancion sin motivo. Si no suena nada, se
+conserva la ultima sesion para que la letra siga en pantalla con la musica en
+pausa.
 
 El detalle que hay que entender para tocar `media.rs`: la posicion no es un
 cronometro. Windows publica una foto (`Position`) con la hora a la que se
@@ -109,6 +148,45 @@ tomo (`LastUpdatedTime`), y Spotify solo la refresca cada dos segundos
 largos. La posicion de verdad es la foto mas lo que ha pasado desde esa
 hora. Medido contra el reloj, esa cuenta no se desvia ni un milisegundo, y
 un salto dentro de la cancion se refleja en unos 130 ms.
+
+## De donde sale la letra
+
+De **[lrclib.net](https://lrclib.net)**, una base de datos abierta y
+colaborativa de letras sincronizadas: gratis, sin cuenta y sin clave. Kuidy
+no guarda ni reparte letras, las pregunta en el momento.
+
+Conviene tenerlo claro porque explica los huecos: **lrclib no tiene nada que
+ver con los subtitulos de YouTube ni con la letra que ensena Spotify**. Que
+una cancion tenga subtitulos en un video no dice nada sobre si esta en
+lrclib. Si falta una, cualquiera puede subirla alli, y aparece para todos.
+
+### Por que a veces no la encuentra
+
+Cuando falta una cancion conocida, casi nunca es que lrclib no la tenga:
+es que el titulo no cuadra. lrclib busca por coincidencia, no por parecido,
+y el titulo que da Windows es el que escribio quien publico el audio. Un
+reproductor decente manda `Bohemian Rhapsody`; un navegador con YouTube
+delante manda `Queen - Bohemian Rhapsody (Official Video Remastered)`, y por
+artista el nombre del canal cuando manda algo.
+
+Por eso la busqueda no es una, sino varias, de la mas fiel a la mas
+desesperada (`consulta.rs`):
+
+| Intento | Con que |
+|---|---|
+| 1 | El titulo y el artista tal cual llegaron |
+| 2 | El titulo sin adornos: fuera `(Official Video)`, `[4K]`, `- Remastered 2011`, `(feat. X)` |
+| 3 | Si no hay artista, el de delante del guion: `Queen - Bohemian Rhapsody` se parte en dos |
+
+Solo se insiste mientras la respuesta sea "no la tengo". Si lrclib dice que
+la pista es instrumental, con otro titulo va a decir lo mismo; y si lo que
+falla es la red, repetir solo multiplica la espera.
+
+Un tramo entre parentesis se tira **solo si todas sus palabras son adorno**.
+Es lo que deja en pie `Everything I Do (I Do It for You)` y `Song (Music Box
+Version)` mientras se lleva `Song (Official Music Video)`. La lista de
+palabras es corta a proposito: cada una que se anade puede romper una cancion
+que la lleve de verdad en el nombre.
 
 ## Por donde va
 
@@ -166,7 +244,7 @@ Lo que no cubre: IPADIC no acierta con algunos numerales irregulares, asi que
 `romaji.rs` lleva una lista corta y a mano (一人, 二人, 大人). Es corta a
 proposito: una tabla larga seria un diccionario paralelo mal hecho.
 
-## Los modulos## Los modulos
+## Los modulos
 
 `src/` se parte por responsabilidad, no por capas. La linea que separa todo
 es la misma: **lo que toca la red bloquea y va en otro hilo, y lo que vuelve
@@ -181,6 +259,7 @@ son senales que la interfaz lee**. El overlay no sabe de donde sale la letra.
 | `media.rs` | Preguntarle a Windows que suena, y convertir su foto de la posicion en un reloj. El ritmo baja cuando no mira nadie |
 | `fetch.rs` | El unico sitio donde se juntan las dos mitades: entra la cancion, sale la letra, y la interfaz no se para |
 | `lyrics.rs` | La letra y por que linea va. No habla con nadie: son datos y una busqueda |
+| `consulta.rs` | De lo que dice Windows a lo que entiende lrclib: quitar adornos del titulo y sacar el artista de donde se pueda |
 | `lrclib.rs` | lrclib.net: los dos endpoints y el orden en que se prueban |
 | `lrc.rs` | El formato LRC, con sus marcas de tiempo y los estribillos repetidos |
 | `translate.rs` | El endpoint no oficial de Google, de donde sale la traduccion. Solo se llama con permiso |
@@ -188,6 +267,7 @@ son senales que la interfaz lee**. El overlay no sabe de donde sale la letra.
 | `playback.rs` | Que suena y por donde va. El reloj de mentira que avanza solo es lo que hace posible el `--demo` |
 | `store.rs` | Donde viven los ajustes: la carpeta del usuario, nunca junto al binario |
 | `log_file.rs` | El log a disco. Sigue tapando lo que parezca un secreto, por si alguna vez vuelve a haberlos |
+| `avisos.rs` | Los avisos de terceros, empotrados en el binario. El diccionario japones exige que su aviso acompane a toda copia, y un `.exe` suelto no lleva carpeta al lado donde ponerlo |
 
 ## La mascota
 

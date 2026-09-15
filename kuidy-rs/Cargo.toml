@@ -6,6 +6,10 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT"
 authors = ["yoiberdev <yoiber696@gmail.com>"]
+# Lo lee cargo-wix para rellenar la ficha que Windows ensena en "Aplicaciones
+# instaladas": sin esto, el MSI sale sin editor ni enlace de soporte.
+repository = "https://github.com/yoiberdev/kuidy-lyrics"
+homepage = "https://github.com/yoiberdev/kuidy-lyrics"
 
 [dependencies]
 chaika = { path = "../../chaika/crates/chaika" }
