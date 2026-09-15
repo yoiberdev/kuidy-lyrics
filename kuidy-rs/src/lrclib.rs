@@ -79,7 +79,46 @@ fn user_agent() -> String {
 }
 
 /// Busca la letra de una cancion. Bloquea: va en otro hilo.
+/// La letra de lo que suena, probando lo que haga falta.
+///
+/// Los metadatos que llegan de Windows no siempre son el nombre de la
+/// cancion: un navegador con YouTube delante manda el titulo del video, con
+/// sus adornos y a veces sin artista. `consulta::intentos` convierte eso en
+/// varias busquedas, de la mas fiel a la mas desesperada, y aqui se prueban
+/// en orden hasta que una traiga letra.
+///
+/// Solo se insiste cuando la respuesta es "no la tengo". Si lrclib dice que
+/// es instrumental, decirselo con otro titulo no va a cambiar la respuesta; y
+/// si lo que falla es la red, repetir solo multiplica la espera.
 pub fn fetch(query: &Query) -> Result<Lyrics, Error> {
+    let intentos = crate::consulta::intentos(query);
+    let total = intentos.len();
+    let mut ultimo = Error::NotFound;
+
+    for (n, intento) in intentos.into_iter().enumerate() {
+        if n > 0 {
+            log::info!(
+                "intento {}/{}: \"{}\" de \"{}\"",
+                n + 1,
+                total,
+                intento.track,
+                intento.artist
+            );
+        }
+        match buscar(&intento) {
+            Ok(lyrics) => return Ok(lyrics),
+            Err(Error::Instrumental) => return Err(Error::Instrumental),
+            Err(e @ Error::Service(_)) => return Err(e),
+            Err(e) => ultimo = e,
+        }
+    }
+
+    Err(ultimo)
+}
+
+/// Una busqueda concreta: primero la coincidencia exacta, luego los
+/// candidatos.
+fn buscar(query: &Query) -> Result<Lyrics, Error> {
     // El camino bueno: coincidencia exacta.
     let exact = get(query)?;
     if let Some(record) = &exact {

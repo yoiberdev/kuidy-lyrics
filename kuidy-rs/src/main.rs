@@ -14,6 +14,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod avisos;
+mod consulta;
 mod fetch;
 mod log_file;
 mod media;
