@@ -221,21 +221,45 @@ fn esperar<T: windows::core::RuntimeType>(op: IAsyncOperation<T>) -> windows::co
 /// De todo lo que suene, con cual quedarse.
 ///
 /// Windows llama "sesion actual" a la del programa con el que se interactuo
-/// por ultima vez, que no siempre es el que suena. Si Spotify esta entre
-/// ellas, gana el; si no, la actual.
+/// por ultima vez, que no tiene por que ser el que suena: basta con poner un
+/// video en el navegador y luego tocar cualquier otra ventana para que la
+/// sesion actual sea la de un programa que no reproduce nada. Eso se veia
+/// como que kuidy dejaba de detectar la cancion sin motivo.
+///
+/// Asi que manda lo que este sonando, y solo entre iguales se prefiere
+/// Spotify. Si no suena nada, se conserva la ultima que hubo para que la
+/// letra siga en pantalla con la musica en pausa.
 fn elegir(manager: &Manager) -> Option<Session> {
-    if let Ok(sesiones) = manager.GetSessions() {
-        for sesion in &sesiones {
-            let suyo = sesion
-                .SourceAppUserModelId()
-                .map(|s| s.to_string_lossy().to_lowercase())
-                .unwrap_or_default();
-            if suyo.contains(PREFERIDO) {
-                return Some(sesion);
-            }
+    let Ok(sesiones) = manager.GetSessions() else {
+        return manager.GetCurrentSession().ok();
+    };
+
+    let mut sonando = None;
+    let mut preferida = None;
+
+    for sesion in &sesiones {
+        let suena = sesion
+            .GetPlaybackInfo()
+            .and_then(|i| i.PlaybackStatus())
+            .map(|s| s == Status::Playing)
+            .unwrap_or(false);
+        let es_preferida = sesion
+            .SourceAppUserModelId()
+            .map(|s| s.to_string_lossy().to_lowercase().contains(PREFERIDO))
+            .unwrap_or(false);
+
+        // Spotify sonando: no hay nada que decidir.
+        if suena && es_preferida {
+            return Some(sesion);
+        }
+        if suena && sonando.is_none() {
+            sonando = Some(sesion);
+        } else if es_preferida && preferida.is_none() {
+            preferida = Some(sesion);
         }
     }
-    manager.GetCurrentSession().ok()
+
+    sonando.or(preferida).or_else(|| manager.GetCurrentSession().ok())
 }
 
 /// Windows da los artistas en una sola cadena. Se parte porque lrclib busca
