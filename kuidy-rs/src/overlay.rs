@@ -16,6 +16,19 @@ const FONDO: Color = Color::rgba8(10, 10, 14, 200);
 /// Cuanto se apaga una linea por cada linea de distancia a la actual.
 const DESVANECIDO: f32 = 0.22;
 
+/// Lo que mide la cabecera con el panel entero.
+///
+/// Esta escrito y no medido porque el velo de arriba tiene que empezar justo
+/// donde ella acaba, y los dos se encogen a la vez.
+const ALTO_CABECERA: f32 = 52.;
+
+/// Lo que tarda el panel en irse o en volver.
+///
+/// Corto y frenando al final: el usuario acaba de pulsar un atajo y quiere
+/// ver el resultado, no una animacion. Pasados los 200ms deja de leerse como
+/// respuesta y empieza a leerse como lentitud.
+const PASO: Transition = Transition::ease_out(ms(160));
+
 pub struct Overlay {
     pub playback: Playback,
     pub lyrics: Signal<State>,
@@ -46,6 +59,18 @@ impl Overlay {
         });
 
         let minimal = prefs.minimal;
+        // Cuanto panel hay: 1 es la ventana entera, 0 es la letra sola sobre
+        // el escritorio.
+        //
+        // Va animado porque el cambio toca cuatro cosas a la vez -- fondo,
+        // contorno, veladuras y cabecera -- y hacerlas saltar todas de golpe
+        // se ve como un parpadeo. Cruzandolas, el panel se disuelve y deja la
+        // letra donde ya estaba.
+        let panel = Animated::new(if minimal.get_untracked() { 0.0_f32 } else { 1.0 }, PASO);
+        let sigue = panel.clone();
+        Effect::new(move || sigue.set(if minimal.get() { 0.0 } else { 1.0 }));
+        let panel = panel.signal();
+
         div()
             .size_full()
             .flex_col()
@@ -56,27 +81,24 @@ impl Overlay {
             // En "solo subtitulos" no hay fondo ninguno: la letra flota sobre
             // lo que haya, y de eso se encarga el contorno de abajo.
             .bg(derive(move || {
-                if minimal.get() {
-                    FONDO.with_alpha(0.)
-                } else {
-                    FONDO.with_alpha(FONDO.a * prefs.opacity.get())
-                }
+                FONDO.with_alpha(FONDO.a * prefs.opacity.get() * panel.get())
             }))
             // Sin panel detras, el texto se apoya en el escritorio, que puede
             // ser de cualquier color. Sin contorno no hay color de letra que
             // sirva para todos.
             // Un pixel basta y sobra: con mas, el contorno se come la letra
             // pequena de la traduccion, que es la que menos margen tiene.
+            //
+            // El ancho no se anima, solo el color: un contorno de medio pixel
+            // no se dibuja a medias, se dibuja mal.
             .text_outline(derive(move || {
-                TextOutline::new(
-                    if minimal.get() { px(1.) } else { px(0.) },
-                    Color::rgba8(0, 0, 0, if minimal.get() { 190 } else { 0 }),
-                )
+                let fuerza = 1.0 - panel.get();
+                TextOutline::new(px(1.), Color::rgba8(0, 0, 0, (190.0 * fuerza) as u8))
             }))
             .family("Segoe UI, sans-serif")
             // Sin barra de titulo: se arrastra por donde sea.
             .drag_window()
-            .child(cabecera(&playback, minimal))
+            .child(cabecera(&playback, panel))
             .child(
                 div()
                     .flex_1()
@@ -118,18 +140,19 @@ impl Overlay {
             // Los bordes se desvanecen para que las lineas no aparezcan
             // cortadas: dos degradados del color del fondo a nada, encima de
             // la lista y sin estorbar al puntero.
-            .child(velo(true, minimal))
-            .child(velo(false, minimal))
+            .child(velo(true, panel))
+            .child(velo(false, panel))
     }
 }
 
 /// El desvanecido de arriba o de abajo.
 ///
 /// En "solo subtitulos" desaparece: es del color del panel, y sin panel se
-/// veria como dos bandas oscuras flotando sobre el escritorio.
-fn velo(arriba: bool, minimal: Signal<bool>) -> Element {
+/// veria como dos bandas oscuras flotando sobre el escritorio. Se va con el
+/// panel, no antes, para que no queden bandas sueltas a mitad del cruce.
+fn velo(arriba: bool, panel: Signal<f32>) -> Element {
     let transparente = Color::rgba(FONDO.r, FONDO.g, FONDO.b, 0.0);
-    let (from, to) = if arriba { (FONDO, transparente) } else { (transparente, FONDO) };
+    let solido = move || FONDO.with_alpha(FONDO.a * panel.get());
     let mut v = div()
         .absolute()
         .left(px(0.))
@@ -137,24 +160,37 @@ fn velo(arriba: bool, minimal: Signal<bool>) -> Element {
         .h(px(56.))
         .pointer_none()
         .gradient(derive(move || {
-            if minimal.get() {
-                Gradient::vertical(transparente, transparente)
+            if arriba {
+                Gradient::vertical(solido(), transparente)
             } else {
-                Gradient::vertical(from, to)
+                Gradient::vertical(transparente, solido())
             }
         }));
-    v = if arriba { v.top(derive(move || if minimal.get() { px(0.) } else { px(52.) })) } else { v.bottom(px(0.)) };
+    // El de arriba sube hasta el borde segun se va la cabecera, en vez de
+    // saltar los 52 pixeles que ocupaba.
+    v = if arriba {
+        v.top(derive(move || px(ALTO_CABECERA * panel.get())))
+    } else {
+        v.bottom(px(0.))
+    };
     v
 }
 
 /// Titulo y artista de lo que suena.
-fn cabecera(playback: &Playback, minimal: Signal<bool>) -> Element {
+fn cabecera(playback: &Playback, panel: Signal<f32>) -> Element {
     let track = playback.track;
     let playing = playback.playing;
     div()
         // En "solo subtitulos" no hay cabecera: el titulo y el artista los
         // sabe el usuario, que para eso los esta escuchando.
-        .visible(derive(move || !minimal.get()))
+        //
+        // Se apaga y se encoge a la vez. Lo segundo es lo que evita el salto:
+        // una cabecera transparente seguiria ocupando sus pixeles, y la letra
+        // daria un brinco hacia arriba justo al terminar el cruce, que es
+        // precisamente el tiron que se queria quitar.
+        .h(derive(move || px(ALTO_CABECERA * panel.get())))
+        .overflow_clip()
+        .opacity(derive(move || panel.get()))
         .w_full()
         .flex_row()
         .items_center()
