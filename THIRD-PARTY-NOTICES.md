@@ -7,7 +7,7 @@ Hay **dos programas distintos** que se descargan por separado, y cada uno lleva 
 | Build | Qué es | Dónde se listan |
 | --- | --- | --- |
 | **Electron 0.9.0-beta.1** | La versión estable, la del instalador `.exe` | [Dependencias de Electron](#dependencias-de-electron) |
-| **Rust 0.3.0** | El port sin navegador, en [`kuidy-rs/`](kuidy-rs/) | [El port en Rust](#el-port-en-rust) |
+| **Rust 0.4.0** | El port sin navegador, en [`kuidy-rs/`](kuidy-rs/) | [El port en Rust](#el-port-en-rust) |
 
 No comparten ni una sola dependencia: el port no lleva Electron, ni Node, ni npm. Y desde la 0.2.0 tampoco comparten los servicios: **el port ya no usa la API de Spotify** —le pregunta a Windows qué suena— y desde la 0.3.0 **el romaji lo calcula en la máquina**, con un diccionario que lleva dentro. Lo único que sigue consultando fuera es [LRCLIB](#letras-lrclib) y, solo con permiso explícito, [la traducción de Google](#traducción-endpoint-no-oficial-de-google).
 
@@ -72,17 +72,17 @@ Buena parte de las entradas del diccionario proceden de *ICOT Free Software*, cu
 
 El port se distribuye como **un solo `.exe`**: las dependencias van compiladas dentro, no en archivos aparte. No hay un `node_modules` que inspeccionar ni una carpeta de instalación con las licencias al lado, así que todo lo que viaja dentro del binario se lista aquí.
 
-Son **273 crates** en la 0.3.0, todos con licencia permisiva y ninguno copyleft. El desglose sale del campo `license` de cada crate, sobre el árbol de dependencias reales de `x86_64-pc-windows-msvc` (sin las de build ni las de test):
+Son **260 crates** en la 0.4.0, todos con licencia permisiva y ninguno copyleft. El desglose sale del campo `license` de cada crate, sobre el árbol de dependencias reales de `x86_64-pc-windows-msvc` (sin las de build ni las de test):
 
 | Licencia | Crates |
 | --- | --- |
-| MIT o Apache-2.0, a elegir | 175 |
-| MIT | 30 |
+| MIT o Apache-2.0, a elegir | 166 |
+| MIT | 29 |
 | Unicode-3.0 | 22 |
 | Zlib entre las opciones | 9 |
-| MIT o Unlicense | 8 |
+| MIT o Unlicense | 6 |
 | Apache-2.0 | 5 |
-| Zlib | 4 |
+| Zlib | 3 |
 | ISC | 3 |
 | MPL-2.0 o MIT o Apache-2.0 | 3 |
 | BSL-1.0 (Boost) | 2 |
@@ -164,6 +164,19 @@ Son los que parten el texto en grafemas y saben dónde puede cortarse una línea
 - **`ring` 0.17.14** (`Apache-2.0 AND ISC`) es la criptografía que hay debajo de ese TLS, y es el caso más enredado del árbol: el código nuevo es ISC, el que viene de **BoringSSL** es Apache-2.0 (con algunos archivos ISC, indicado archivo por archivo), y el polyfill de `once_cell` es Apache-2.0 o MIT. Los textos van en el propio crate, en `LICENSE`, `LICENSE-other-bits` y `LICENSE-BoringSSL`.
 - **`libloading`, `rustls-webpki` y `untrusted`** son ISC a secas. **`rustls`** ofrece a elegir entre Apache-2.0, ISC y MIT.
 - **`clipboard-win` y `error-code`** (BSL-1.0, Boost) son lo que deja copiar texto. La licencia de Boost no exige reproducir el aviso cuando lo que se distribuye es solo el binario compilado, pero se cita igual.
+- **`instant` 0.1.13 y `subtle` 2.6.1** son BSD-3-Clause, que **sí** obliga a reproducir el aviso de copyright al distribuir en forma binaria. Se reproducen:
+
+  ```
+  Copyright (c) 2019, Sébastien Crozet
+  ```
+
+  ```
+  Copyright (c) 2016-2017 Isis Agora Lovecruft, Henry de Valence.
+  All rights reserved.
+  Copyright (c) 2016-2024 Isis Agora Lovecruft. All rights reserved.
+  ```
+
+  El texto completo de cada uno está en el archivo `LICENSE` de su crate. `subtle` es parte de la pila de criptografía; `instant` mide el tiempo.
 
 ### Tipografías e iconos
 
@@ -188,15 +201,22 @@ Los derechos de las letras pertenecen a sus autores y editoriales; LRCLIB y Kuid
 
 ## Traducción: endpoint no oficial de Google
 
-La función **opcional** de traducción usa `google-translate-api-x`, que habla con un endpoint **no oficial y no documentado** de Google Translate. No es una API pública con contrato: puede cambiar, limitar peticiones o dejar de responder en cualquier momento, y no hay ningún acuerdo entre Kuidy Lyrics y Google.
+Los dos programas hablan con el mismo endpoint **no oficial y no documentado** de Google Translate, pero no por el mismo camino: la versión de Electron usa el paquete `google-translate-api-x`, y el port en Rust lo llama él mismo, sin intermediario, desde `kuidy-rs/src/translate.rs`. En los dos casos es lo mismo de frágil: no es una API pública con contrato, puede cambiar, limitar peticiones o dejar de responder en cualquier momento, y no hay ningún acuerdo entre Kuidy Lyrics y Google.
 
-Por eso la traducción es **opt-in**: está desactivada hasta que el usuario la activa explícitamente. Mientras no la active, ni una línea de la letra sale del equipo. El romaji del japonés no está afectado, porque se genera offline con kuroshiro/kuromoji.
+Por eso la traducción es **opt-in** en ambos: está desactivada hasta que se autoriza explícitamente. En el port, la primera letra que se podría traducir abre un diálogo que lo pregunta una sola vez, y la respuesta se guarda.
+
+El romaji del japonés **no pasa por ahí en ninguna de las dos versiones**, aunque por motivos distintos: Electron lo genera con kuroshiro y kuromoji, y el port con `vibrato` sobre el [diccionario IPADIC](#diccionario-japonés-ipadic) que lleva empotrado. Ninguno de los dos usa la red para eso, y en el port tampoco pide permiso, porque no hay nada que salga del equipo.
+
+Lo que sí sale siempre, sin preguntar y en las dos versiones, es la **búsqueda** de la letra: título, artista, álbum y duración van a [LRCLIB](#letras-lrclib) en cada cambio de canción. Sin eso no hay letra que enseñar. La letra en sí solo sale del equipo si se autoriza la traducción.
 
 ## Spotify
 
 **Kuidy Lyrics no está afiliada, asociada, autorizada ni respaldada por Spotify AB**, ni por ninguna de sus filiales. *Spotify* y el logotipo de Spotify son marcas registradas de Spotify AB.
 
-Kuidy Lyrics es un cliente no oficial que usa la Spotify Web API pública, con las credenciales que cada usuario crea a su nombre en <https://developer.spotify.com/dashboard>, y únicamente para leer qué se está reproduciendo. No descarga, almacena ni reproduce audio.
+Ninguna de las dos versiones descarga, almacena ni reproduce audio, pero se enteran de qué suena de forma distinta:
+
+- **Electron** es un cliente no oficial de la Spotify Web API pública, con las credenciales que cada usuario crea a su nombre en <https://developer.spotify.com/dashboard>, y únicamente para leer qué se está reproduciendo.
+- **El port en Rust**, desde la 0.2.0, **no habla con Spotify en absoluto**. Le pregunta a Windows qué se está reproduciendo, a través de `Windows.Media.Control`, que es el mismo registro que alimenta el panel de medios del sistema. Por eso no pide cuenta, ni Client ID, ni autorización, y funciona con cualquier reproductor. La marca de Spotify aparece en su código solo para preferir esa sesión cuando hay varias sonando.
 
 ## Iconos y tipografías
 

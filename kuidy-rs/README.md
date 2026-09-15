@@ -23,8 +23,12 @@ cargo test                       # 60 tests, sin tocar la red
 cargo test -- --ignored --nocapture   # ademas, 4 peticiones de verdad a lrclib y a Google
 ```
 
-Ctrl+Alt+H muestra u oculta las letras; Ctrl+Alt+J abre los ajustes. El icono
-de la bandeja hace lo mismo, y ahi esta tambien Salir.
+Tres atajos globales: Ctrl+Alt+H muestra u oculta las letras, Ctrl+Alt+J abre
+los ajustes y Ctrl+Alt+M deja solo los subtitulos. Los mismos tres salen en la
+chuleta de la ventana de ajustes.
+
+El menu de la bandeja lleva ademas Abrir carpeta de logs, Avisos de terceros,
+los enlaces de Ko-fi y Buy Me a Coffee, la version y Salir.
 
 ## Compilar
 
@@ -201,12 +205,23 @@ que la lleve de verdad en el nombre.
 | Romaji para japones, sin internet | hecho |
 | Mascota propia, y de ahi el icono de bandeja, ventana y .exe | hecho |
 
-**Nada de esto sale de la maquina sin permiso.** Traducir y romanizar
-manda el texto de la letra a un servicio de fuera, asi que de serie esta
-apagado: la primera vez que hace falta se pregunta una sola vez, y lo que se
-conteste se guarda en `translationAllowed`. Quien ya usaba kuidy conserva su
+**Lo unico que manda la letra fuera es traducir**, y por eso es lo unico que
+pide permiso. De serie esta apagado: la primera vez que aparece una letra
+traducible -- una que no sea japonesa y que no venga ya traducida de lrclib --
+se pregunta una sola vez, la respuesta se guarda en `translationAllowed` y el
+haber preguntado, en `translationAsked`. Quien ya usaba kuidy conserva su
 ajuste de visualizacion, pero se le pregunta igual, porque nunca dio permiso
 explicito.
+
+El romaji no entra en ese trato: se calcula aqui, en `romaji.rs`, con el
+diccionario que va dentro del binario. No pide permiso y se pone en cuanto la
+letra es japonesa, se conteste lo que se conteste al dialogo; otra cosa es que
+se vea, que eso lo decide `showSubs`.
+
+Lo que si sale sin preguntar es la **busqueda** de la letra: cada cambio de
+cancion manda titulo, artista, album y duracion a lrclib.net. Sin eso no hay
+letra que ensenar, asi que no hay interruptor que lo apague. La letra en si
+solo sale de la maquina si se autoriza la traduccion.
 
 Ojo con no confundir los dos interruptores, que antes eran uno y hacian un
 lio: `showSubs` decide si se **ensena** la linea de abajo, y

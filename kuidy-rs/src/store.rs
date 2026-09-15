@@ -1,10 +1,18 @@
-//! Donde se guardan las credenciales y los ajustes.
+//! Donde se escribe lo que la app deja en disco.
 //!
 //! En la carpeta del usuario, no junto al binario: la app puede estar en
-//! `Archivos de programa`, donde no se escribe. Los nombres son los mismos
-//! que usa el kuidy de Electron para que las dos versiones puedan convivir
-//! mientras dure el port, pero en su propia carpeta — compartir el archivo
-//! de tokens entre dos apps que refrescan a la vez es pedir una carrera.
+//! `Archivos de programa`, donde no se escribe. Cuelgan de aqui los ajustes
+//! (`prefs.rs`), los logs (`log_file.rs`) y el archivo de avisos de terceros
+//! que se deja al abrirlo desde la bandeja (`avisos.rs`).
+//!
+//! Ya no se guarda ninguna credencial. Las hubo mientras el port hablaba con
+//! la API de Spotify; desde que lo que suena se le pregunta a Windows no hay
+//! cuenta, ni token, ni Client ID que custodiar. Es la razon por la que este
+//! modulo se quedo en abrir y escribir archivos y no llego a necesitar
+//! cifrado.
+//!
+//! La carpeta es propia y no la del kuidy de Electron, para que las dos
+//! versiones puedan convivir sin pisarse los ajustes.
 
 use std::io;
 use std::path::PathBuf;
