@@ -326,6 +326,10 @@ fn main() -> Result<(), chaika::platform::Error> {
             // ve, y entonces no hay de donde volver a agarrarla: no tiene
             // marco ni sale en la barra de tareas.
             min_size: Some(size(px(220.), px(120.))),
+            // Un overlay que roba el foco falla en lo que promete. Mover la
+            // ventana o estirarla sigue funcionando -- eso es raton, no foco
+            // -- y el teclado nunca fue suyo: los tres atajos son globales.
+            focusable: false,
             // Oculta hasta colocarla sobre el area util.
             visible: false,
             ..Default::default()
