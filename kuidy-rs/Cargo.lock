@@ -814,6 +814,7 @@ name = "chaika-layout"
 version = "0.1.0-alpha.1"
 dependencies = [
  "chaika-geom",
+ "slotmap",
  "taffy",
 ]
 
@@ -4188,7 +4189,6 @@ dependencies = [
  "arrayvec",
  "serde",
  "slotmap",
- "smallvec",
 ]
 
 [[package]]

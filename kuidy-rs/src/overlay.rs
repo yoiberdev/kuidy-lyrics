@@ -118,9 +118,12 @@ impl Overlay {
                     .px(px(16.))
                     .py(px(60.))
                     .gap(px(10.))
-                    // APANO(chaika#4): una sola fuente de hijos. Llamar dos
-                    // veces a `children_for` no anade: la segunda pisa a la
-                    // primera sin avisar, y la lista se queda vacia.
+                    // Una sola fuente de hijos, que es el contrato de chaika:
+                    // un elemento admite **una** lista dinamica, y llamar dos
+                    // veces a `children_for` protesta con un `debug_assert`.
+                    // Los `.child()` fijos si sobreviven y van delante. Por eso
+                    // el aviso y las lineas salen de la misma fuente, con un
+                    // enum, en vez de dos listas.
                     .children_for(
                         move || match cuantas.get() {
                             0 => vec![Fila::Aviso(aviso.get())],
@@ -132,6 +135,7 @@ impl Overlay {
                             // El aviso lo centra la lista, como a cualquier
                             // otra fila.
                             Fila::Aviso(m) => text(m.clone())
+                                .text_align(TextAlign::Center)
                                 .text_size(px(13.))
                                 .color(Color::rgba8(255, 255, 255, 150)),
                         },
@@ -271,6 +275,11 @@ fn linea(
         .w_full()
         .child(
             text(con(|l| l.shown().to_string()))
+                // Centrado dentro del propio texto, no solo la caja: un verso
+                // largo envuelve en varias lineas, y sin esto la segunda se
+                // pega a la izquierda mientras el bloque entero parece
+                // centrado.
+                .text_align(TextAlign::Center)
                 .text_size(derive(move || {
                     let base = if es_actual() { 19. } else { 14. };
                     px(base * prefs.font_scale.get())
@@ -295,6 +304,7 @@ fn linea(
                     String::new()
                 }
             }))
+            .text_align(TextAlign::Center)
             .text_size(derive(move || {
                 let base = if es_actual() { 13. } else { 11. };
                 px(base * prefs.font_scale.get())
