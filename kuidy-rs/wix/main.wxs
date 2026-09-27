@@ -84,22 +84,55 @@
                 <Directory Id='ProgramsFolder' Name='Programs'>
                     <Directory Id='APPLICATIONFOLDER' Name='kuidy'>
 
-                        <Component Id='Binario' Guid='*'>
+                        <!--
+                          En una instalacion por usuario la clave de cada
+                          componente tiene que estar en HKCU, no puede ser el
+                          propio fichero: el instalador no puede preguntarle a
+                          HKLM por algo que vive en el perfil de un usuario, y
+                          Windows lo rechaza al validar (ICE38). Y las carpetas
+                          del perfil hay que decir explicitamente que se
+                          borran al desinstalar (ICE64).
+                        -->
+                        <!--
+                          GUID fijo y no '*': un componente que mezcla clave de
+                          registro y fichero no admite el automatico, y ademas
+                          tiene que ser **el mismo entre versiones** o una
+                          actualizacion no reconoceria lo que ya estaba puesto.
+                          No los cambies.
+                        -->
+                        <Component Id='Binario' Guid='E6ADA59B-7392-47ED-8679-946C9A136011'>
+                            <RegistryValue
+                                Root='HKCU'
+                                Key='Software\yoiberdev\kuidy'
+                                Name='instalado'
+                                Type='integer'
+                                Value='1'
+                                KeyPath='yes'/>
                             <File
                                 Id='kuidyEXE'
                                 Name='kuidy.exe'
                                 DiskId='1'
-                                Source='$(var.CargoTargetBinDir)\kuidy.exe'
-                                KeyPath='yes'/>
+                                Source='$(var.CargoTargetBinDir)\kuidy.exe'/>
+                            <RemoveFolder Id='QuitarAppFolder' On='uninstall'/>
+                            <RemoveFolder
+                                Id='QuitarProgramsFolder'
+                                Directory='ProgramsFolder'
+                                On='uninstall'/>
                         </Component>
 
-                        <Component Id='Licencia' Guid='*'>
+                        <Component Id='Licencia' Guid='CE9BCBF0-2D21-4C4B-888C-4FFEB129F47D'>
+                            <RegistryValue
+                                Root='HKCU'
+                                Key='Software\yoiberdev\kuidy'
+                                Name='licencia'
+                                Type='integer'
+                                Value='1'
+                                KeyPath='yes'/>
                             <File
                                 Id='LicenseFile'
                                 Name='License.rtf'
                                 DiskId='1'
-                                Source='wix\License.rtf'
-                                KeyPath='yes'/>
+                                Source='wix\License.rtf'/>
                         </Component>
 
                     </Directory>
