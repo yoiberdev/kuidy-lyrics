@@ -14,7 +14,12 @@ use chaika::widgets::{self, Palette, slider, switch_row};
 
 use crate::prefs::Prefs;
 
-const BG: Color = Color::hex(0x14141c);
+/// El tinte que va **encima** del acrilico, no un fondo opaco.
+///
+/// El difuminado lo compone el escritorio por detras; lo que pinta la app es
+/// una capa oscura con alfa que le da color y hace legible el texto. Con un
+/// color opaco aqui el acrilico no se veria en absoluto.
+const BG: Color = Color::rgba8(18, 18, 26, 170);
 const CARD: Color = Color::hex(0x1e1e28);
 const MUTED: Color = Color::hex(0x8a8a9a);
 const LABEL: Color = Color::rgba8(220, 220, 232, 255);
@@ -71,17 +76,36 @@ pub fn open(prefs: Prefs, abierto: Signal<Option<WindowToken>>) {
             icon: Some(crate::tray_icon()),
             icon_large: Some(crate::window_icon()),
             size: size(px(360.), px(ALTO)),
-            transparent: false,
-            decorations: true,
+            // Sin barra de titulo y con acrilico: el escritorio difumina lo
+            // que hay detras, que es lo que hace que un panel flotante no
+            // parezca una ventana mas. Para que se vea hay que dejarle sitio:
+            // `transparent` y un fondo con alfa, no un color opaco encima.
+            transparent: true,
+            decorations: false,
+            backdrop: Backdrop::Acrylic,
+            corner: Corner::Round,
             resizable: false,
-            skip_taskbar: false,
+            skip_taskbar: true,
+            // Por encima, como los flotantes del sistema. Sin esto se abre
+            // detras de lo que tengas delante y parece que no se abrio; y
+            // como ademas nunca llega a tener el foco, tampoco se cierra
+            // sola. Un flotante que no se ve ni se va es lo peor de los dos
+            // mundos.
+            always_on_top: true,
             ..Default::default()
         },
         background: BG,
         escape_closes: true,
     };
 
-    let token = app::open(options, move |token| view(prefs, token));
+    // La colocacion va **dentro** del constructor: `app::open` encola la
+    // creacion, asi que justo despues de llamarla la ventana todavia no
+    // existe y `app::window` devuelve `None`. Es el mismo sitio donde el
+    // overlay se coloca a si mismo.
+    let token = app::open(options, move |token| {
+        colocar_junto_a_la_bandeja(token);
+        view(prefs, token)
+    });
     abierto.set(Some(token));
 }
 
@@ -217,4 +241,40 @@ fn regulador(
                 ),
         )
         .child(slider(valor, rango).w_full())
+}
+
+/// Coloca el panel donde Windows pone sus propios flotantes: pegado a la
+/// esquina de la bandeja, sobre la barra de tareas.
+///
+/// No se pregunta donde esta el icono --- la bandeja no lo cuenta --- sino
+/// donde acaba el area util, que es justo por encima de la barra. Es lo que
+/// hacen el panel de volumen y el de red, y cae bien tenga la barra donde la
+/// tenga: si esta arriba, el area util empieza mas abajo y el panel tambien.
+fn colocar_junto_a_la_bandeja(token: WindowToken) {
+    let Some(w) = app::window(token) else { return };
+    let Some(monitor) = w.primary_monitor() else { return };
+    let area = monitor.work_area;
+    let tam = size(px(360.), px(ALTO));
+    // Un dedo de margen con el borde, como los flotantes del sistema.
+    let margen = px(12.);
+    let x = area.origin.x + area.size.width - tam.width - margen;
+    let y = area.origin.y + area.size.height - tam.height - margen;
+    w.set_position(point(x, y));
+    // Y que tome el foco: un flotante que se cierra al perderlo y nace sin el
+    // se cierra solo antes de que nadie lo vea.
+    w.focus();
+}
+
+/// Se cierra al hacer clic fuera, como cualquier flotante.
+///
+/// Es lo que lo distingue de una ventana: no se queda ahi ocupando sitio.
+///
+/// **No registra su propio manejador**: `app::on_window_event` guarda uno
+/// solo y el segundo pisa al primero sin avisar. Lo llama el unico manejador
+/// que hay, en `main`.
+pub fn al_perder_el_foco(token: WindowToken, abierto: Signal<Option<WindowToken>>) {
+    if abierto.get_untracked() == Some(token) {
+        app::close(token);
+        abierto.set(None);
+    }
 }

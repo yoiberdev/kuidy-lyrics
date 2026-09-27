@@ -131,7 +131,7 @@ impl Overlay {
                         },
                         Fila::clave,
                         move |fila| match fila {
-                            Fila::Linea(i) => linea(*i, lyrics, actual, prefs),
+                            Fila::Linea(i) => linea(*i, lyrics, actual, prefs, panel),
                             // El aviso lo centra la lista, como a cualquier
                             // otra fila.
                             Fila::Aviso(m) => text(m.clone())
@@ -252,6 +252,7 @@ fn linea(
     lyrics: Signal<State>,
     actual: Memo<Option<usize>>,
     prefs: Prefs,
+    panel: Signal<f32>,
 ) -> Element {
     let es_actual = move || actual.get() == Some(index);
     let distancia = move || match actual.get() {
@@ -275,6 +276,37 @@ fn linea(
         .w_full()
         .child(
             text(con(|l| l.shown().to_string()))
+                // Un halo oscuro y difuminado detras de la linea, solo cuando
+                // no hay panel.
+                //
+                // Sin el, en "solo subtitulos" la letra se lee **encima** de
+                // lo que haya debajo --- una terminal, un editor --- y las dos
+                // cosas compiten hasta que no se entiende ninguna. El contorno
+                // de un pixel que habia no basta sobre un fondo con textura.
+                //
+                // Sin desplazamiento y con mucho desenfoque: no es una sombra
+                // proyectada, es un halo. Y sin fondo en el elemento, asi que
+                // no se ve ninguna caja: solo la letra sobre una mancha suave
+                // que se apaga sola hacia los bordes.
+                .shadow(derive(move || {
+                    // El halo sigue al desvanecido de **su** linea. La que
+                    // suena va entera; las de alrededor ya se apagan solas, y
+                    // su halo con ellas. Sin esto, los halos de varias lineas
+                    // seguidas se suman y forman un rectangulo oscuro, que es
+                    // justo la caja que un halo viene a evitar.
+                    let fuerza = (1.0 - panel.get()) * opacidad();
+                    // Sin `spread`: crecer antes de desenfocar es lo que
+                    // hace que los halos de dos lineas seguidas se toquen y
+                    // formen una mancha con borde, que es la caja que se
+                    // queria evitar. Mucho desenfoque y poca opacidad separan
+                    // la letra sin que se note donde empieza el halo.
+                    Shadow {
+                        offset: point(Px::ZERO, Px::ZERO),
+                        blur: px(16.),
+                        spread: Px::ZERO,
+                        color: Color::rgba(0.0, 0.0, 0.0, 0.9 * fuerza),
+                    }
+                }))
                 // Centrado dentro del propio texto, no solo la caja: un verso
                 // largo envuelve en varias lineas, y sin esto la segunda se
                 // pega a la izquierda mientras el bloque entero parece

@@ -148,7 +148,7 @@ fn menu_bandeja(visible: bool, minimal: bool) -> Vec<MenuEntry> {
 ///
 /// El overlay no tiene barra de titulo ni aparece en la barra de tareas, asi
 /// que sin esto no habria forma de recuperarlo una vez oculto.
-fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
+fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) -> Signal<Option<WindowToken>> {
     let ajustes: Signal<Option<WindowToken>> = Signal::new(None);
 
     let alternar = move || {
@@ -167,6 +167,17 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
     // como lo hacia el kuidy de Electron -- los dos ajustes viajaban juntos,
     // porque una letra flotando sin fondo que ademas se traga los clics no
     // tiene ningun sentido.
+    // El fondo del sistema sigue al modo: acrilico con panel, nada en solo
+    // subtitulos. Se corre tambien al arrancar, para respetar lo que el
+    // usuario dejara puesto la ultima vez.
+    Effect::new(move || {
+        let fondo =
+            if prefs.minimal.get() { Backdrop::None } else { Backdrop::Acrylic };
+        if let Some(w) = app::window(WindowToken::MAIN) {
+            w.set_backdrop(fondo);
+        }
+    });
+
     let alternar_minimal = move || {
         let ahora = !prefs.minimal.get_untracked();
         prefs.minimal.set(ahora);
@@ -249,15 +260,37 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) {
             Err(e) => log::warn!("sin atajo para {que}: {e}"),
         }
     }
+
+    ajustes
 }
 /// Recuerda donde deja el usuario la ventana.
 ///
 /// Escribe con retraso a proposito: `Moved` llega en cada paso del arrastre,
 /// y guardar el disco a ese ritmo por mover una ventana es absurdo. Se
 /// espera a que la mano pare.
-fn recordar_posicion(prefs: Prefs) {
+fn recordar_posicion(prefs: Prefs, ajustes: Signal<Option<WindowToken>>) {
     let pendiente = std::rc::Rc::new(std::cell::Cell::new(false));
+    // Si el panel de ajustes llego a tener el foco alguna vez.
+    //
+    // Sin esto se cierra solo nada mas abrirse: entre que se crea y que
+    // Windows se lo da, llega un `Focused(false)` que no significa "el usuario
+    // hizo clic fuera" sino "todavia no lo tenia".
+    let tuvo_foco = std::rc::Rc::new(std::cell::Cell::new(false));
+    // **Un solo manejador para toda la app**: `on_window_event` guarda uno, y
+    // registrar otro pisa este sin decir nada. Lo que necesite enterarse de un
+    // evento de ventana entra por aqui.
     app::on_window_event(move |token, event| {
+        // El panel de ajustes es un flotante: se cierra al clicar fuera.
+        if Some(token) == ajustes.get_untracked()
+            && let chaika::platform::Event::Focused(tiene) = event
+        {
+            if *tiene {
+                tuvo_foco.set(true);
+            } else if tuvo_foco.replace(false) {
+                settings::al_perder_el_foco(token, ajustes);
+            }
+            return;
+        }
         if token != WindowToken::MAIN {
             return;
         }
@@ -319,6 +352,12 @@ fn main() -> Result<(), chaika::platform::Error> {
             size: size(px(420.), px(320.)),
             transparent: true,
             decorations: false,
+            // El acrilico no va aqui: lo pone y lo quita `conectar_mandos`
+            // segun el modo. Con panel difumina lo de detras y se ve moderno;
+            // en solo subtitulos seria un rectangulo difuminado flotando en
+            // mitad de la pantalla, que es justo lo contrario de lo que se
+            // quiere.
+            corner: Corner::Round,
             always_on_top: true,
             skip_taskbar: true,
             resizable: true,
@@ -350,9 +389,9 @@ fn main() -> Result<(), chaika::platform::Error> {
 
         let playback = Playback::new();
         let visible = Signal::new(true);
-        conectar_mandos(prefs, visible);
+        let ajustes = conectar_mandos(prefs, visible);
 
-        recordar_posicion(prefs);
+        recordar_posicion(prefs, ajustes);
 
         // Los clics pasan o no segun el ajuste; y si pasan, la ventana deja
         // de poder arrastrarse, que es el trato.
