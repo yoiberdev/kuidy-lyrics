@@ -61,7 +61,10 @@ fn split_bilingual(text: &str) -> (&str, Option<&str>) {
 /// Una letra completa a partir de su LRC, o `None` si no habia ni una marca.
 pub fn lyrics(text: &str) -> Option<Lyrics> {
     let lines = parse(text);
-    (!lines.is_empty()).then_some(Lyrics { lines, synced: true })
+    (!lines.is_empty()).then_some(Lyrics {
+        lines,
+        synced: true,
+    })
 }
 
 /// Las marcas del principio de una linea y lo que queda detras.
@@ -72,7 +75,9 @@ fn stamps_of(raw: &str) -> (Vec<Duration>, &str) {
     let mut stamps = Vec::new();
     let mut rest = raw.trim_start();
     while let Some(end) = bracket_end(rest) {
-        let Some(at) = parse_stamp(&rest[1..end]) else { break };
+        let Some(at) = parse_stamp(&rest[1..end]) else {
+            break;
+        };
         stamps.push(at);
         rest = &rest[end + 1..];
     }
@@ -110,7 +115,9 @@ fn parse_stamp(s: &str) -> Option<Duration> {
         }
         None => 0,
     };
-    Some(Duration::from_millis(minutes * 60_000 + seconds * 1000 + millis))
+    Some(Duration::from_millis(
+        minutes * 60_000 + seconds * 1000 + millis,
+    ))
 }
 
 #[cfg(test)]
@@ -169,14 +176,19 @@ mod tests {
         let lines = parse("[00:05.00] Tomate algo, vamos a perrear^Have a drink, let's dance");
         assert_eq!(lines.len(), 1);
         assert_eq!(lines[0].text, "Tomate algo, vamos a perrear");
-        assert_eq!(lines[0].translation.as_deref(), Some("Have a drink, let's dance"));
+        assert_eq!(
+            lines[0].translation.as_deref(),
+            Some("Have a drink, let's dance")
+        );
     }
 
     #[test]
     fn un_acento_circunflejo_suelto_no_parte_la_linea() {
         // Sin nada a un lado, no es un separador: es parte del verso.
-        let lines = parse("[00:05.00] solo esto ^
-[00:06.00] ^ y esto");
+        let lines = parse(
+            "[00:05.00] solo esto ^
+[00:06.00] ^ y esto",
+        );
         assert_eq!(lines[0].text, "solo esto ^");
         assert!(lines[0].translation.is_none());
         assert_eq!(lines[1].text, "^ y esto");

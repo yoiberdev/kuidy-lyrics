@@ -12,7 +12,6 @@ use crate::prefs::Prefs;
 
 const FONDO: Color = Color::rgba8(10, 10, 14, 200);
 
-
 /// Cuanto se apaga una linea por cada linea de distancia a la actual.
 const DESVANECIDO: f32 = 0.22;
 
@@ -37,15 +36,18 @@ pub struct Overlay {
 
 impl Overlay {
     pub fn view(&self) -> Element {
-        let Overlay { playback, lyrics, prefs } = self;
+        let Overlay {
+            playback,
+            lyrics,
+            prefs,
+        } = self;
         let (playback, lyrics, prefs) = (playback.clone(), *lyrics, *prefs);
         let position = playback.position;
 
         // Que linea suena, como senal derivada: la lista y la cabecera la
         // leen, y solo se repinta cuando cambia de verdad.
-        let actual = Memo::new(move || {
-            lyrics.with(|s| s.lyrics().and_then(|l| l.line_at(position.get())))
-        });
+        let actual =
+            Memo::new(move || lyrics.with(|s| s.lyrics().and_then(|l| l.line_at(position.get()))));
         // Cuantas lineas hay que pintar, y si hay algo que decir en su lugar.
         let cuantas = Memo::new(move || lyrics.with(|s| s.lyrics().map_or(0, |l| l.lines.len())));
         let aviso = Memo::new(move || lyrics.with(|s| s.message().to_string()));
@@ -66,7 +68,14 @@ impl Overlay {
         // contorno, veladuras y cabecera -- y hacerlas saltar todas de golpe
         // se ve como un parpadeo. Cruzandolas, el panel se disuelve y deja la
         // letra donde ya estaba.
-        let panel = Animated::new(if minimal.get_untracked() { 0.0_f32 } else { 1.0 }, PASO);
+        let panel = Animated::new(
+            if minimal.get_untracked() {
+                0.0_f32
+            } else {
+                1.0
+            },
+            PASO,
+        );
         let sigue = panel.clone();
         Effect::new(move || sigue.set(if minimal.get() { 0.0 } else { 1.0 }));
         let panel = panel.signal();
@@ -261,11 +270,19 @@ fn linea(
     };
 
     let opacidad = move || {
-        if es_actual() { 1.0 } else { (0.7 - distancia() as f32 * DESVANECIDO).max(0.12) }
+        if es_actual() {
+            1.0
+        } else {
+            (0.7 - distancia() as f32 * DESVANECIDO).max(0.12)
+        }
     };
     let con = move |f: fn(&crate::lyrics::Line) -> String| {
         derive(move || {
-            lyrics.with(|s| s.lyrics().and_then(|l| l.lines.get(index)).map_or(String::new(), &f))
+            lyrics.with(|s| {
+                s.lyrics()
+                    .and_then(|l| l.lines.get(index))
+                    .map_or(String::new(), &f)
+            })
         })
     };
 
@@ -317,7 +334,11 @@ fn linea(
                     px(base * prefs.font_scale.get())
                 }))
                 .weight(derive(move || {
-                    if es_actual() { FontWeight::BOLD } else { FontWeight::NORMAL }
+                    if es_actual() {
+                        FontWeight::BOLD
+                    } else {
+                        FontWeight::NORMAL
+                    }
                 }))
                 .color(derive(move || Color::rgba(1.0, 1.0, 1.0, opacidad()))),
         )
@@ -344,4 +365,3 @@ fn linea(
             .color(derive(move || Color::rgba(1.0, 1.0, 1.0, opacidad() * 0.6))),
         )
 }
-

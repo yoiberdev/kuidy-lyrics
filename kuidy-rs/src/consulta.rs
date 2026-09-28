@@ -85,7 +85,10 @@ pub fn intentos(query: &Query) -> Vec<Query> {
 
     let limpio = limpiar(&query.track);
     if !limpio.is_empty() && limpio != query.track {
-        out.push(Query { track: limpio.clone(), ..query.clone() });
+        out.push(Query {
+            track: limpio.clone(),
+            ..query.clone()
+        });
     }
 
     // Un canal no es un artista. Lo que Windows entrega de un navegador con
@@ -93,8 +96,16 @@ pub fn intentos(query: &Query) -> Vec<Query> {
     // - Topic" --- y con eso lrclib no encuentra nada aunque tenga la cancion.
     let canal = limpiar_canal(&query.artist);
     if !canal.is_empty() && canal != query.artist {
-        let track = if limpio.is_empty() { query.track.clone() } else { limpio.clone() };
-        out.push(Query { track, artist: canal, ..query.clone() });
+        let track = if limpio.is_empty() {
+            query.track.clone()
+        } else {
+            limpio.clone()
+        };
+        out.push(Query {
+            track,
+            artist: canal,
+            ..query.clone()
+        });
     }
 
     // Y el titulo de YouTube suele traer "Artista - Cancion", que es donde
@@ -103,9 +114,17 @@ pub fn intentos(query: &Query) -> Vec<Query> {
     // canal, el artista no falta, sobra --- y estorba mas que faltar. Esa
     // condicion de "solo si esta vacio" era la razon de que una cancion
     // conocidisima no apareciera.
-    let base = if limpio.is_empty() { query.track.clone() } else { limpio };
+    let base = if limpio.is_empty() {
+        query.track.clone()
+    } else {
+        limpio
+    };
     if let Some((artista, titulo)) = partir(&base) {
-        out.push(Query { track: titulo, artist: artista, ..query.clone() });
+        out.push(Query {
+            track: titulo,
+            artist: artista,
+            ..query.clone()
+        });
     }
 
     out.dedup_by(|a, b| a.track == b.track && a.artist == b.artist);
@@ -120,7 +139,11 @@ pub fn intentos(query: &Query) -> Vec<Query> {
 fn limpiar(titulo: &str) -> String {
     let sin_grupos = quitar_grupos(titulo);
     let sin_cola = quitar_cola(&sin_grupos);
-    sin_cola.trim().trim_end_matches(['-', '|', ':']).trim().to_string()
+    sin_cola
+        .trim()
+        .trim_end_matches(['-', '|', ':'])
+        .trim()
+        .to_string()
 }
 
 /// Quita los parentesis y corchetes que solo llevan adorno dentro.
@@ -209,7 +232,10 @@ fn limpiar_canal(artista: &str) -> String {
     let sin_topic = a.strip_suffix(" - Topic").unwrap_or(a);
     let sin_vevo = sin_topic.strip_suffix("VEVO").unwrap_or(sin_topic);
     // "Official" suelto al final, que tambien se ve: "Alejandro Sanz Official".
-    let sin_oficial = sin_vevo.trim().strip_suffix(" Official").unwrap_or(sin_vevo);
+    let sin_oficial = sin_vevo
+        .trim()
+        .strip_suffix(" Official")
+        .unwrap_or(sin_vevo);
     sin_oficial.trim().to_string()
 }
 
@@ -251,7 +277,10 @@ mod tests {
 
     #[test]
     fn se_cae_el_parentesis_de_adorno() {
-        assert_eq!(limpiar("Yoru ni Kakeru (Official Music Video)"), "Yoru ni Kakeru");
+        assert_eq!(
+            limpiar("Yoru ni Kakeru (Official Music Video)"),
+            "Yoru ni Kakeru"
+        );
         assert_eq!(limpiar("Song [4K]"), "Song");
         assert_eq!(limpiar("Song (Lyrics)"), "Song");
     }
@@ -274,13 +303,20 @@ mod tests {
 
     #[test]
     fn se_cae_la_cola_colgada_del_guion() {
-        assert_eq!(limpiar("Bohemian Rhapsody - Remastered 2011"), "Bohemian Rhapsody");
+        assert_eq!(
+            limpiar("Bohemian Rhapsody - Remastered 2011"),
+            "Bohemian Rhapsody"
+        );
     }
 
     #[test]
     fn no_se_cae_lo_que_no_es_adorno() {
         let titulo = "Marea - En mi cabeza";
-        assert_eq!(limpiar(titulo), titulo, "eso es artista y cancion, no un adorno");
+        assert_eq!(
+            limpiar(titulo),
+            titulo,
+            "eso es artista y cancion, no un adorno"
+        );
     }
 
     #[test]
@@ -331,10 +367,15 @@ mod tests {
     /// asi que la unica consulta que podia acertar no se llegaba a hacer.
     #[test]
     fn un_canal_de_youtube_no_impide_encontrar_al_artista() {
-        let q = query("Alejandro Sanz - Cancion (Videoclip Oficial)", "AlejandroSanzVEVO");
+        let q = query(
+            "Alejandro Sanz - Cancion (Videoclip Oficial)",
+            "AlejandroSanzVEVO",
+        );
         let intentos = intentos(&q);
-        let pares: Vec<(&str, &str)> =
-            intentos.iter().map(|i| (i.track.as_str(), i.artist.as_str())).collect();
+        let pares: Vec<(&str, &str)> = intentos
+            .iter()
+            .map(|i| (i.track.as_str(), i.artist.as_str()))
+            .collect();
 
         assert!(
             pares.contains(&("Cancion", "Alejandro Sanz")),
@@ -350,7 +391,13 @@ mod tests {
             pares.contains(&("Alejandro Sanz - Cancion", "AlejandroSanzVEVO")),
             "y con el titulo sin el adorno en espanol: {pares:?}"
         );
-        assert_eq!(pares[0], ("Alejandro Sanz - Cancion (Videoclip Oficial)", "AlejandroSanzVEVO"));
+        assert_eq!(
+            pares[0],
+            (
+                "Alejandro Sanz - Cancion (Videoclip Oficial)",
+                "AlejandroSanzVEVO"
+            )
+        );
     }
 
     /// YouTube Music publica cada artista como un canal "Fulano - Topic".
@@ -363,5 +410,4 @@ mod tests {
         assert_eq!(limpiar_canal("Alejandro Sanz"), "Alejandro Sanz");
         assert_eq!(limpiar_canal("Topic"), "Topic");
     }
-
 }

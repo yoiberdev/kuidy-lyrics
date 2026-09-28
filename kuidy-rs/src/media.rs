@@ -65,7 +65,11 @@ const PREFERIDO: &str = "spotify";
 
 /// Empieza a seguir lo que suena. Sigue vivo mientras viva la app.
 pub fn start(playback: Playback, visible: Signal<bool>) {
-    let state = Rc::new(State { playback, visible, fallos: Cell::new(0) });
+    let state = Rc::new(State {
+        playback,
+        visible,
+        fallos: Cell::new(0),
+    });
     preguntar(state.clone());
     estimar(state);
 }
@@ -123,7 +127,10 @@ fn preguntar(state: Rc<State>) {
 fn aplicar(playback: &Playback, foto: Foto) {
     // Al cambiar de cancion, una linea en el log: es lo primero que hay que
     // mirar cuando alguien dice que no le salen las letras.
-    if playback.track.with_untracked(|t| t.as_ref() != foto.track.as_ref()) {
+    if playback
+        .track
+        .with_untracked(|t| t.as_ref() != foto.track.as_ref())
+    {
         match &foto.track {
             Some(t) => log::info!("suena: {} - {}", t.artists_line(), t.name),
             None => log::info!("no suena nada"),
@@ -158,7 +165,11 @@ fn leer() -> windows::core::Result<Foto> {
     apartamento();
     let manager = esperar(Manager::RequestAsync()?)?;
     let Some(sesion) = elegir(&manager) else {
-        return Ok(Foto { track: None, position: Duration::ZERO, playing: false });
+        return Ok(Foto {
+            track: None,
+            position: Duration::ZERO,
+            playing: false,
+        });
     };
 
     let playing = sesion.GetPlaybackInfo()?.PlaybackStatus()? == Status::Playing;
@@ -189,7 +200,11 @@ fn leer() -> windows::core::Result<Foto> {
         })
     };
 
-    Ok(Foto { track, position, playing })
+    Ok(Foto {
+        track,
+        position,
+        playing,
+    })
 }
 
 /// Espera a que termine una operacion de WinRT.
@@ -259,7 +274,9 @@ fn elegir(manager: &Manager) -> Option<Session> {
         }
     }
 
-    sonando.or(preferida).or_else(|| manager.GetCurrentSession().ok())
+    sonando
+        .or(preferida)
+        .or_else(|| manager.GetCurrentSession().ok())
 }
 
 /// Windows da los artistas en una sola cadena. Se parte porque lrclib busca
@@ -269,7 +286,12 @@ fn artistas(crudo: &str) -> Vec<String> {
     if crudo.is_empty() {
         return Vec::new();
     }
-    crudo.split(", ").map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect()
+    crudo
+        .split(", ")
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect()
 }
 
 /// Windows cuenta el tiempo en unidades de 100 nanosegundos.
@@ -323,7 +345,10 @@ mod tests {
     fn la_hora_en_la_escala_de_windows_es_creible() {
         let ahora = ahora_en_ticks();
         // 2024-01-01 y 2100-01-01 en la escala de Windows.
-        assert!(ahora > 133_170_048_000_000_000, "no puede ser anterior a 2024");
+        assert!(
+            ahora > 133_170_048_000_000_000,
+            "no puede ser anterior a 2024"
+        );
         assert!(ahora < 157_000_000_000_000_000, "ni posterior a 2100");
     }
 
@@ -336,6 +361,10 @@ mod tests {
         };
         assert_eq!(state(true, 0).siguiente(), ACTIVE);
         assert_eq!(state(false, 0).siguiente(), HIDDEN, "oculto, mas lento");
-        assert_eq!(state(true, 3).siguiente(), RETRY, "fallando, se insiste despacio");
+        assert_eq!(
+            state(true, 3).siguiente(),
+            RETRY,
+            "fallando, se insiste despacio"
+        );
     }
 }

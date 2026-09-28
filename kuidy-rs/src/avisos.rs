@@ -106,7 +106,10 @@ mod tests {
         assert!(t.contains("LegalOn Technologies"), "falta el otro titular");
         assert!(t.contains("NO WARRANTY"), "falta la seccion que ICOT exige");
         assert!(t.contains("ICOT Free Software"), "falta la mencion a ICOT");
-        assert!(t.contains("BCCWJ"), "falta de donde salen los datos remapeados");
+        assert!(
+            t.contains("BCCWJ"),
+            "falta de donde salen los datos remapeados"
+        );
     }
 
     #[test]

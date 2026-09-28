@@ -49,7 +49,9 @@ impl Log for Dual {
         }
         self.terminal.log(record);
 
-        let Ok(mut file) = self.file.lock() else { return };
+        let Ok(mut file) = self.file.lock() else {
+            return;
+        };
         let Some(file) = file.as_mut() else { return };
         let line = format!(
             "{} {:<5} [{}] {}\n",
@@ -85,7 +87,10 @@ fn timestamp() -> String {
     let secs = now.as_secs();
     let (y, m, d) = civil_from_days((secs / 86_400) as i64);
     let (hh, mm, ss) = (secs / 3600 % 24, secs / 60 % 60, secs % 60);
-    format!("{y:04}-{m:02}-{d:02}T{hh:02}:{mm:02}:{ss:02}.{:03}Z", now.subsec_millis())
+    format!(
+        "{y:04}-{m:02}-{d:02}T{hh:02}:{mm:02}:{ss:02}.{:03}Z",
+        now.subsec_millis()
+    )
 }
 
 /// Dias desde 1970 a fecha del calendario.
@@ -157,19 +162,24 @@ pub fn redact(text: &str) -> String {
 
 /// Arranca el log: terminal siempre, archivo si se puede.
 pub fn init() {
-    let terminal = env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info"),
-    )
-    .build();
+    let terminal =
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).build();
     let level = terminal.filter();
 
     let file = path().and_then(|path| {
         rotate(&path);
-        OpenOptions::new().create(true).append(true).open(&path).ok()
+        OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .ok()
     });
     let tiene_archivo = file.is_some();
 
-    let dual = Dual { terminal, file: Mutex::new(file) };
+    let dual = Dual {
+        terminal,
+        file: Mutex::new(file),
+    };
     if log::set_boxed_logger(Box::new(dual)).is_ok() {
         log::set_max_level(level);
     }
@@ -186,7 +196,9 @@ pub fn init() {
 /// Si el archivo crecio demasiado, se guarda como `.1` y se empieza de cero.
 /// Solo se conserva uno viejo: el interesante es siempre el ultimo.
 fn rotate(path: &std::path::Path) {
-    let Ok(meta) = std::fs::metadata(path) else { return };
+    let Ok(meta) = std::fs::metadata(path) else {
+        return;
+    };
     if meta.len() <= MAX_BYTES {
         return;
     }
@@ -203,7 +215,10 @@ mod tests {
         let limpio = redact(sucio);
         assert!(!limpio.contains("BQD123abc"), "{limpio}");
         assert!(!limpio.contains("AQx999"), "{limpio}");
-        assert!(limpio.contains("access_token"), "la clave si se ve: {limpio}");
+        assert!(
+            limpio.contains("access_token"),
+            "la clave si se ve: {limpio}"
+        );
         assert!(limpio.contains("<redactado>"));
     }
 
@@ -212,14 +227,20 @@ mod tests {
         let limpio = redact("Authorization: Bearer BQC_muy_secreto123 fin");
         assert!(!limpio.contains("BQC_muy_secreto123"));
         assert!(limpio.contains("Bearer <redactado>"));
-        assert!(limpio.ends_with(" fin"), "lo de despues se conserva: {limpio}");
+        assert!(
+            limpio.ends_with(" fin"),
+            "lo de despues se conserva: {limpio}"
+        );
     }
 
     #[test]
     fn el_codigo_de_la_vuelta_de_oauth_tampoco() {
         let limpio = redact("callback?code=AQABGACNvq8eSYewLujfVx&state=xyz");
         assert!(!limpio.contains("AQABGACNvq8eSYewLujfVx"));
-        assert!(limpio.contains("state=xyz"), "lo que no es secreto se queda: {limpio}");
+        assert!(
+            limpio.contains("state=xyz"),
+            "lo que no es secreto se queda: {limpio}"
+        );
     }
 
     #[test]
@@ -240,7 +261,11 @@ mod tests {
 
     #[test]
     fn el_calendario_acierta_en_los_casos_que_duelen() {
-        assert_eq!(civil_from_days(0), (1970, 1, 1), "el principio de los tiempos");
+        assert_eq!(
+            civil_from_days(0),
+            (1970, 1, 1),
+            "el principio de los tiempos"
+        );
         assert_eq!(civil_from_days(59), (1970, 3, 1), "1970 no fue bisiesto");
         assert_eq!(civil_from_days(365), (1971, 1, 1));
         // 2000 fue bisiesto (divisible por 400) y 1900 no (por 100).

@@ -30,7 +30,11 @@ impl Line {
     /// Lo que se muestra: los silencios llevan una nota en vez de un hueco,
     /// como en el kuidy de Electron.
     pub fn shown(&self) -> &str {
-        if self.text.is_empty() { "♪" } else { &self.text }
+        if self.text.is_empty() {
+            "♪"
+        } else {
+            &self.text
+        }
     }
 }
 
@@ -83,7 +87,10 @@ mod tests {
         assert_eq!(letra.line_at(Duration::from_secs_f32(1.6)), Some(1));
         assert_eq!(letra.line_at(Duration::from_secs(6)), Some(2));
         // Pasado el final, se queda en la ultima.
-        assert_eq!(letra.line_at(Duration::from_secs(600)), Some(letra.lines.len() - 1));
+        assert_eq!(
+            letra.line_at(Duration::from_secs(600)),
+            Some(letra.lines.len() - 1)
+        );
     }
 
     #[test]

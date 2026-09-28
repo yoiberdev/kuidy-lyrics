@@ -16,11 +16,12 @@
 mod avisos;
 mod consulta;
 mod fetch;
+mod local;
 mod log_file;
-mod media;
 mod lrc;
 mod lrclib;
 mod lyrics;
+mod media;
 mod overlay;
 mod playback;
 mod prefs;
@@ -54,7 +55,12 @@ fn colocar(window: &chaika::platform::Window, guardada: Option<(f32, f32)>) {
         .iter()
         .map(|m| {
             let a = m.work_area;
-            (a.origin.x.get(), a.origin.y.get(), a.size.width.get(), a.size.height.get())
+            (
+                a.origin.x.get(),
+                a.origin.y.get(),
+                a.size.width.get(),
+                a.size.height.get(),
+            )
         })
         .collect();
 
@@ -96,7 +102,11 @@ fn a_la_vista(pos: (f32, f32), tam: (f32, f32), areas: &[(f32, f32, f32, f32)]) 
 fn icono(bytes: &[u8]) -> Icon {
     let n = ((bytes.len() / 4) as f64).sqrt() as u32;
     debug_assert_eq!((n * n * 4) as usize, bytes.len(), "el icono no es cuadrado");
-    Icon { width: n, height: n, rgba: bytes.to_vec() }
+    Icon {
+        width: n,
+        height: n,
+        rgba: bytes.to_vec(),
+    }
 }
 
 /// El icono de la bandeja: la version simplificada, que es la que aguanta
@@ -114,12 +124,20 @@ pub fn window_icon() -> Icon {
 
 /// El texto de la entrada que muestra u oculta las letras.
 fn etiqueta_toggle(visible: bool) -> &'static str {
-    if visible { "Ocultar letras" } else { "Mostrar letras" }
+    if visible {
+        "Ocultar letras"
+    } else {
+        "Mostrar letras"
+    }
 }
 
 /// El texto de la entrada del modo de solo subtitulos.
 fn etiqueta_minimal(minimal: bool) -> &'static str {
-    if minimal { "Volver al panel" } else { "Solo subtitulos" }
+    if minimal {
+        "Volver al panel"
+    } else {
+        "Solo subtitulos"
+    }
 }
 
 fn menu_bandeja(visible: bool, minimal: bool) -> Vec<MenuEntry> {
@@ -127,6 +145,9 @@ fn menu_bandeja(visible: bool, minimal: bool) -> Vec<MenuEntry> {
         MenuEntry::item("toggle", etiqueta_toggle(visible)),
         MenuEntry::item("minimal", etiqueta_minimal(minimal)),
         MenuEntry::item("ajustes", "Ajustes..."),
+        MenuEntry::separator(),
+        MenuEntry::item("lrc", "Usar un archivo .lrc para esta cancion..."),
+        MenuEntry::item("olvidar-lrc", "Olvidar la letra propia"),
         MenuEntry::separator(),
         // Quien reporte un fallo tiene que poder mandar el log sin ir a
         // buscar %APPDATA% a mano.
@@ -148,7 +169,12 @@ fn menu_bandeja(visible: bool, minimal: bool) -> Vec<MenuEntry> {
 ///
 /// El overlay no tiene barra de titulo ni aparece en la barra de tareas, asi
 /// que sin esto no habria forma de recuperarlo una vez oculto.
-fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) -> Signal<Option<WindowToken>> {
+fn conectar_mandos(
+    prefs: Prefs,
+    visible: Signal<bool>,
+    track: Signal<Option<Track>>,
+    recarga: Signal<u32>,
+) -> Signal<Option<WindowToken>> {
     let ajustes: Signal<Option<WindowToken>> = Signal::new(None);
 
     let alternar = move || {
@@ -171,8 +197,11 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) -> Signal<Option<WindowT
     // subtitulos. Se corre tambien al arrancar, para respetar lo que el
     // usuario dejara puesto la ultima vez.
     Effect::new(move || {
-        let fondo =
-            if prefs.minimal.get() { Backdrop::None } else { Backdrop::Acrylic };
+        let fondo = if prefs.minimal.get() {
+            Backdrop::None
+        } else {
+            Backdrop::Acrylic
+        };
         if let Some(w) = app::window(WindowToken::MAIN) {
             w.set_backdrop(fondo);
         }
@@ -183,7 +212,10 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) -> Signal<Option<WindowT
         prefs.minimal.set(ahora);
         prefs.click_through.set(ahora);
         app::with_tray(|t| t.set_label("minimal", etiqueta_minimal(ahora)));
-        log::info!("solo subtitulos: {}", if ahora { "encendido" } else { "apagado" });
+        log::info!(
+            "solo subtitulos: {}",
+            if ahora { "encendido" } else { "apagado" }
+        );
     };
 
     if let Err(e) = app::tray(TrayOptions {
@@ -198,6 +230,8 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) -> Signal<Option<WindowT
         "toggle" => alternar(),
         "minimal" => alternar_minimal(),
         "ajustes" => settings::open(prefs, ajustes),
+        "lrc" => pedir_lrc(track, recarga),
+        "olvidar-lrc" => olvidar_lrc(track, recarga),
         "avisos" => avisos::abrir(),
         "logs" => match log_file::dir() {
             Some(dir) => {
@@ -232,14 +266,22 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) -> Signal<Option<WindowT
     });
     // Clic izquierdo en el icono: mostrar u ocultar, como el kuidy de siempre.
     app::on_tray(move |ev| {
-        if let TrayEvent::Click { button: MouseButton::Left, .. } = ev {
+        if let TrayEvent::Click {
+            button: MouseButton::Left,
+            ..
+        } = ev
+        {
             alternar();
         }
     });
 
     // Los mismos atajos que la version de Electron.
     let atajos = [
-        (KeyCode::KeyH, "mostrar u ocultar las letras", Box::new(alternar) as Box<dyn Fn()>),
+        (
+            KeyCode::KeyH,
+            "mostrar u ocultar las letras",
+            Box::new(alternar) as Box<dyn Fn()>,
+        ),
         (
             KeyCode::KeyJ,
             "abrir los ajustes",
@@ -252,7 +294,11 @@ fn conectar_mandos(prefs: Prefs, visible: Signal<bool>) -> Signal<Option<WindowT
         ),
     ];
     for (key, que, accion) in atajos {
-        let modificadores = Modifiers { ctrl: true, alt: true, ..Default::default() };
+        let modificadores = Modifiers {
+            ctrl: true,
+            alt: true,
+            ..Default::default()
+        };
         match app::hotkey(modificadores, key, accion) {
             Ok(_) => log::info!("atajo Ctrl+Alt+{key:?} listo: {que}"),
             // Otra app lo tiene: se dice y se sigue, que no es motivo para
@@ -294,7 +340,9 @@ fn recordar_posicion(prefs: Prefs, ajustes: Signal<Option<WindowToken>>) {
         if token != WindowToken::MAIN {
             return;
         }
-        let chaika::platform::Event::Moved(p) = event else { return };
+        let chaika::platform::Event::Moved(p) = event else {
+            return;
+        };
         prefs.window.set(Some((p.x.get(), p.y.get())));
         if pendiente.replace(true) {
             return;
@@ -305,6 +353,61 @@ fn recordar_posicion(prefs: Prefs, ajustes: Signal<Option<WindowToken>>) {
             prefs.save_now();
         });
     });
+}
+
+/// Pide un `.lrc` para lo que suena y lo guarda.
+///
+/// Es la salida para lo que no esta en ninguna base: lrclib es comunitario y
+/// si una cancion falta es porque nadie la subio. Ninguna consulta la hace
+/// aparecer, asi que la pone quien la tiene.
+fn pedir_lrc(track: Signal<Option<Track>>, recarga: Signal<u32>) {
+    let Some(pista) = track.get_untracked() else {
+        chaika::dialog::message("kuidy", "No suena nada ahora mismo.");
+        return;
+    };
+    chaika::dialog::open()
+        .title(format!("Letra para «{}»", pista.name))
+        .filter("Letras sincronizadas", &["lrc", "txt"])
+        .pick_file(move |elegido| {
+            let Some(path) = elegido else { return };
+            let texto = match std::fs::read_to_string(&path) {
+                Ok(t) => t,
+                Err(e) => {
+                    chaika::dialog::message("kuidy", format!("No se pudo leer el archivo: {e}"));
+                    return;
+                }
+            };
+            match local::guardar(&pista, &texto) {
+                Ok(l) => {
+                    log::info!(
+                        "letra propia guardada para «{}»: {} lineas",
+                        pista.name,
+                        l.lines.len()
+                    );
+                    recarga.set(recarga.get_untracked().wrapping_add(1));
+                }
+                Err(e) => {
+                    chaika::dialog::message("kuidy", &e);
+                }
+            }
+        });
+}
+
+/// Olvida la letra propia de lo que suena, para volver a la de la red.
+fn olvidar_lrc(track: Signal<Option<Track>>, recarga: Signal<u32>) {
+    let Some(pista) = track.get_untracked() else {
+        return;
+    };
+    if !local::hay(&pista) {
+        chaika::dialog::message("kuidy", "Esta cancion no tiene letra propia.");
+        return;
+    }
+    match local::olvidar(&pista) {
+        Ok(()) => recarga.set(recarga.get_untracked().wrapping_add(1)),
+        Err(e) => {
+            chaika::dialog::message("kuidy", format!("No se pudo borrar: {e}"));
+        }
+    }
 }
 
 /// La cancion de mentira con la que arrancar sin cuenta de Spotify.
@@ -327,7 +430,11 @@ fn demo() -> Option<Track> {
     };
     Some(Track {
         name: name.into(),
-        artists: if artist.is_empty() { Vec::new() } else { vec![artist.into()] },
+        artists: if artist.is_empty() {
+            Vec::new()
+        } else {
+            vec![artist.into()]
+        },
         album: String::new(),
         duration: Duration::from_secs(duration),
     })
@@ -389,7 +496,11 @@ fn main() -> Result<(), chaika::platform::Error> {
 
         let playback = Playback::new();
         let visible = Signal::new(true);
-        let ajustes = conectar_mandos(prefs, visible);
+        // Sube cada vez que el usuario cambia la letra propia de una cancion.
+        // `fetch::follow` la lee, asi que subirla vuelve a resolver la letra
+        // sin tener que cambiar de cancion.
+        let recarga = Signal::new(0_u32);
+        let ajustes = conectar_mandos(prefs, visible, playback.track, recarga);
 
         recordar_posicion(prefs, ajustes);
 
@@ -408,13 +519,18 @@ fn main() -> Result<(), chaika::platform::Error> {
             // probar la tuberia entera.
             log::info!("demo: {} - {}", track.artists.join(", "), track.name);
             playback.fake(track);
-            fetch::follow(playback.track, prefs)
+            fetch::follow(playback.track, prefs, recarga)
         } else {
             media::start(playback.clone(), visible);
-            fetch::follow(playback.track, prefs)
+            fetch::follow(playback.track, prefs, recarga)
         };
 
-        Overlay { playback, lyrics, prefs }.view()
+        Overlay {
+            playback,
+            lyrics,
+            prefs,
+        }
+        .view()
     })
 }
 

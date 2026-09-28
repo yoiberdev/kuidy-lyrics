@@ -57,8 +57,17 @@ pub fn target_language() -> String {
         .or_else(|_| std::env::var("LANGUAGE"))
         .unwrap_or_default();
     // "es_ES.UTF-8" -> "es"
-    let code = raw.split(['_', '-', '.']).next().unwrap_or("").trim().to_lowercase();
-    if code.len() == 2 { code } else { "es".to_string() }
+    let code = raw
+        .split(['_', '-', '.'])
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_lowercase();
+    if code.len() == 2 {
+        code
+    } else {
+        "es".to_string()
+    }
 }
 
 /// Traduce varias lineas de una vez.
@@ -92,7 +101,11 @@ pub fn translate_lines(lines: &[String], target: &str) -> Result<Vec<String>, Er
     }
 
     for group in groups(lines, &pending) {
-        let joined = group.iter().map(|&i| lines[i].as_str()).collect::<Vec<_>>().join("\n");
+        let joined = group
+            .iter()
+            .map(|&i| lines[i].as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
         let translated = request(&joined, target)?;
         let parts: Vec<&str> = translated.split('\n').collect();
         if parts.len() != group.len() {
@@ -140,12 +153,19 @@ fn groups(lines: &[String], pending: &[usize]) -> Vec<Vec<usize>> {
 }
 
 fn cached(target: &str, text: &str) -> Option<String> {
-    CACHE.with(|c| c.borrow().get(&(target.to_string(), text.to_string())).cloned())
+    CACHE.with(|c| {
+        c.borrow()
+            .get(&(target.to_string(), text.to_string()))
+            .cloned()
+    })
 }
 
 fn remember(target: &str, text: &str, translation: &str) {
     CACHE.with(|c| {
-        c.borrow_mut().insert((target.to_string(), text.to_string()), translation.to_string());
+        c.borrow_mut().insert(
+            (target.to_string(), text.to_string()),
+            translation.to_string(),
+        );
     });
 }
 
@@ -186,8 +206,8 @@ fn request(text: &str, target: &str) -> Result<String, Error> {
 ///
 /// Interesa el primer campo de cada tramo del primer array, concatenados.
 fn parse(body: &str) -> Result<String, Error> {
-    let value: serde_json::Value = serde_json::from_str(body)
-        .map_err(|e| Error::Service(format!("no es JSON: {e}")))?;
+    let value: serde_json::Value =
+        serde_json::from_str(body).map_err(|e| Error::Service(format!("no es JSON: {e}")))?;
     let segments = value
         .get(0)
         .and_then(|v| v.as_array())
@@ -223,7 +243,8 @@ mod tests {
 
     #[test]
     fn lee_la_respuesta_anidada_de_google() {
-        let body = r#"[[["hola ","hello ",null,null,10],["mundo","world",null,null,10]],null,"en"]"#;
+        let body =
+            r#"[[["hola ","hello ",null,null,10],["mundo","world",null,null,10]],null,"en"]"#;
         assert_eq!(parse(body).unwrap(), "hola mundo");
     }
 
@@ -259,7 +280,10 @@ mod tests {
         remember("es", "hello", "hola");
         let lineas = vec!["hello".to_string()];
         // Sin red: si no estuviera cacheado, esto fallaria.
-        assert_eq!(translate_lines(&lineas, "es").unwrap(), vec!["hola".to_string()]);
+        assert_eq!(
+            translate_lines(&lineas, "es").unwrap(),
+            vec!["hola".to_string()]
+        );
     }
 
     #[test]
@@ -277,9 +301,6 @@ mod tests {
         assert!(!is_japanese("我的名字"), "chino no es japones");
         assert!(!is_japanese("just english"));
     }
-
-
-
 
     #[test]
     fn el_idioma_sale_del_sistema_o_es_espanol() {
@@ -302,7 +323,6 @@ mod red {
     /// El caso que de verdad puede romperse: una letra entera, con sus
     /// grupos, sus lineas vacias y sus versos en ingles por medio. Si los
     /// mojones no aguantan a esta escala, la funcion no sirve para nada.
-
 
     #[test]
     #[ignore = "necesita internet y un endpoint no oficial"]
@@ -328,4 +348,3 @@ mod red {
         }
     }
 }
-

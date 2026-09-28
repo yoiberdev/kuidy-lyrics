@@ -41,11 +41,7 @@ static COMPRIMIDO: &[u8] = include_bytes!("../assets/ipadic-recortado.dic.zst");
 ///
 /// La lista es corta a proposito: cada entrada es una decision a mano, y una
 /// tabla larga seria un diccionario paralelo mal hecho.
-const EXCEPCIONES: &[(&str, &str)] = &[
-    ("一人", "ヒトリ"),
-    ("二人", "フタリ"),
-    ("大人", "オトナ"),
-];
+const EXCEPCIONES: &[(&str, &str)] = &[("一人", "ヒトリ"), ("二人", "フタリ"), ("大人", "オトナ")];
 
 /// El tokenizador, construido una sola vez y solo si se usa.
 fn tokenizador() -> Option<&'static Tokenizer> {
@@ -82,9 +78,9 @@ fn tokenizador() -> Option<&'static Tokenizer> {
 /// Pero dentro de una letra ya identificada como japonesa hay lineas de puro
 /// kanji -- 「夢」, 「一人」 -- que hay que leer igual.
 fn tiene_japones(texto: &str) -> bool {
-    texto.chars().any(|c| {
-        ('\u{3040}'..='\u{30ff}').contains(&c) || ('\u{4e00}'..='\u{9fff}').contains(&c)
-    })
+    texto
+        .chars()
+        .any(|c| ('\u{3040}'..='\u{30ff}').contains(&c) || ('\u{4e00}'..='\u{9fff}').contains(&c))
 }
 
 /// La lectura de unas lineas en japones, en alfabeto latino.
@@ -203,7 +199,10 @@ fn juntar_excepciones(trozos: &mut Vec<Trozo>) {
             }
             if cuantos > 1
                 && largo == palabra.len()
-                && trozos[i..i + cuantos].iter().map(|t| t.superficie.as_str()).collect::<String>()
+                && trozos[i..i + cuantos]
+                    .iter()
+                    .map(|t| t.superficie.as_str())
+                    .collect::<String>()
                     == *palabra
             {
                 juntados = Some((cuantos, (*palabra).to_string()));
@@ -260,7 +259,10 @@ mod tests {
             ("今日はいい天気です", "kyou wa ii tenki desu"),
             // Pero la terminacion de un verbo no: no puede salir "a tta".
             ("初めて会った日から", "hajimete atta hi kara"),
-            ("沈むように溶けてゆくように", "shizumu you ni tokete yuku you ni"),
+            (
+                "沈むように溶けてゆくように",
+                "shizumu you ni tokete yuku you ni",
+            ),
             ("立ち上がれ", "tachiagare"),
         ];
         for (japones, esperado) in casos {
@@ -301,7 +303,9 @@ mod tests {
         for (original, leido) in letra.iter().zip(romanize(&letra)) {
             assert!(!leido.is_empty(), "sin lectura: {original}");
             assert!(
-                !leido.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)),
+                !leido
+                    .chars()
+                    .any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)),
                 "quedo kanji sin leer en {original} -> {leido}"
             );
         }

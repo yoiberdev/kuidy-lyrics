@@ -178,7 +178,6 @@ impl Prefs {
             Err(e) => log::warn!("no se pudieron serializar los ajustes: {e}"),
         }
     }
-
 }
 
 #[cfg(test)]
@@ -211,7 +210,10 @@ mod tests {
         let s: Stored = serde_json::from_str(viejo).expect("se entiende igual");
         assert_eq!(s.opacity, 0.6, "lo que si estaba se respeta");
         assert_eq!(s.font_scale, 1.2);
-        assert!(s.show_subs, "y lo que falta toma el valor DE SERIE, no el del tipo");
+        assert!(
+            s.show_subs,
+            "y lo que falta toma el valor DE SERIE, no el del tipo"
+        );
         assert!(!s.click_through);
         assert_eq!(s.window, None);
     }
@@ -225,7 +227,10 @@ mod tests {
         let s: Stored = serde_json::from_str(de_antes).expect("se entiende");
         assert!(s.show_subs, "lo que tenia puesto no se le toca");
         assert!(!s.translation_allowed, "pero traducir no esta autorizado");
-        assert!(!s.translation_asked, "porque no consta que se le preguntara");
+        assert!(
+            !s.translation_asked,
+            "porque no consta que se le preguntara"
+        );
     }
 
     #[test]
@@ -240,7 +245,10 @@ mod tests {
     fn un_archivo_vacio_da_los_valores_de_serie() {
         let s: Stored = serde_json::from_str("{}").expect("se entiende");
         assert_eq!(s, Stored::default());
-        assert_eq!(s.opacity, 0.95, "no 0.0, que es lo que daria un default por campo");
+        assert_eq!(
+            s.opacity, 0.95,
+            "no 0.0, que es lo que daria un default por campo"
+        );
     }
 
     #[test]

@@ -4,9 +4,9 @@
 //! que cancion suena, otro hilo va a buscar su letra, y el resultado vuelve
 //! al hilo principal convertido en otra senal que el overlay lee.
 
+use chaika::prelude::*;
 use std::cell::Cell;
 use std::rc::Rc;
-use chaika::prelude::*;
 
 use crate::lrclib::{self, Query};
 use crate::lyrics::Lyrics;
@@ -52,7 +52,7 @@ impl State {
 /// anterior: si la letra de la cancion vieja llega tarde, se tira. Sin eso,
 /// saltar de tema deja la letra equivocada en pantalla justo cuando el
 /// usuario mas mira.
-pub fn follow(track: Signal<Option<Track>>, prefs: Prefs) -> Signal<State> {
+pub fn follow(track: Signal<Option<Track>>, prefs: Prefs, recarga: Signal<u32>) -> Signal<State> {
     let state = Signal::new(State::Idle);
     // Cada busqueda lleva su numero; solo la ultima tiene derecho a escribir.
     let generation = Rc::new(Cell::new(0_u64));
@@ -61,12 +61,25 @@ pub fn follow(track: Signal<Option<Track>>, prefs: Prefs) -> Signal<State> {
     let generacion = Rc::clone(&generation);
 
     Effect::new(move || {
+        // Leerla suscribe: cambiar la letra propia de una cancion vuelve a
+        // resolverla sin tener que cambiar de cancion.
+        recarga.get();
         let Some(track) = track.get() else {
             state.set(State::Idle);
             return;
         };
         let mine = generation.get() + 1;
         generation.set(mine);
+
+        // Lo que puso el usuario manda sobre la red, y se resuelve sin salir
+        // del hilo: si hay archivo propio no hay busqueda, ni espera, ni
+        // parpadeo de "buscando". Es lo que hace que ponerlo una vez sirva
+        // para siempre.
+        if let Some(lyrics) = crate::local::leer(&track) {
+            state.set(State::Ready(lyrics));
+            return;
+        }
+
         state.set(State::Loading);
 
         let query = Query {
@@ -147,7 +160,10 @@ pub fn follow(track: Signal<Option<Track>>, prefs: Prefs) -> Signal<State> {
                 ),
             )
             .confirm(move |si| {
-                log::info!("permiso para traducir: {}", if si { "concedido" } else { "denegado" });
+                log::info!(
+                    "permiso para traducir: {}",
+                    if si { "concedido" } else { "denegado" }
+                );
                 prefs.translation_allowed.set(si);
                 // Esto despierta este mismo efecto, y ahora ya con respuesta.
                 prefs.translation_asked.set(true);
@@ -174,8 +190,16 @@ pub fn follow(track: Signal<Option<Track>>, prefs: Prefs) -> Signal<State> {
 /// Basta con que una parte de las lineas lleven kana; una cancion japonesa
 /// tiene versos sueltos en ingles.
 fn en_japones(lyrics: &Lyrics) -> bool {
-    let con_letra = lyrics.lines.iter().filter(|l| !l.text.trim().is_empty()).count();
-    let japonesas = lyrics.lines.iter().filter(|l| crate::translate::is_japanese(&l.text)).count();
+    let con_letra = lyrics
+        .lines
+        .iter()
+        .filter(|l| !l.text.trim().is_empty())
+        .count();
+    let japonesas = lyrics
+        .lines
+        .iter()
+        .filter(|l| crate::translate::is_japanese(&l.text))
+        .count();
     japonesas * 4 >= con_letra
 }
 
@@ -259,7 +283,10 @@ mod tests {
 
     #[test]
     fn el_mensaje_distingue_lo_definitivo_de_lo_pasajero() {
-        assert_eq!(mensaje(&lrclib::Error::NotFound), "No hay letra para esta cancion");
+        assert_eq!(
+            mensaje(&lrclib::Error::NotFound),
+            "No hay letra para esta cancion"
+        );
         assert_eq!(mensaje(&lrclib::Error::Instrumental), "Instrumental");
         assert_eq!(
             mensaje(&lrclib::Error::Service("500".into())),

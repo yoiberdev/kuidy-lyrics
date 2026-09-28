@@ -24,7 +24,12 @@ const ICONOS: [(&str, u32, &str); 2] = [("bandeja", 16, PEQUENO), ("ventana", 64
 
 /// Lo que lleva el `.ico` del ejecutable: lo que Windows pide para la barra
 /// de titulo, la barra de tareas, Alt+Tab y el explorador.
-const ICO: [(u32, &str); 4] = [(16, PEQUENO), (32, COMPLETO), (48, COMPLETO), (256, COMPLETO)];
+const ICO: [(u32, &str); 4] = [
+    (16, PEQUENO),
+    (32, COMPLETO),
+    (48, COMPLETO),
+    (256, COMPLETO),
+];
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
@@ -39,7 +44,11 @@ fn main() {
     // En crudo y no en PNG: descomprimir en la app pediria un
     // descodificador, y 16x16 en crudo son 1 KB.
     for (destino, n, svg) in ICONOS {
-        let rgba: Vec<u8> = dibujar(svg, n).pixels().iter().flat_map(demultiplicar).collect();
+        let rgba: Vec<u8> = dibujar(svg, n)
+            .pixels()
+            .iter()
+            .flat_map(demultiplicar)
+            .collect();
         std::fs::write(out.join(format!("{destino}.rgba")), rgba).expect("icono");
     }
 
@@ -86,8 +95,10 @@ fn dibujar(svg: &str, n: u32) -> tiny_skia::Pixmap {
 /// Windows admite PNG dentro de un `.ico` desde Vista, asi que no hace
 /// falta el BMP con su mascara al reves de toda la vida.
 fn empaquetar_ico() -> Vec<u8> {
-    let imagenes: Vec<Vec<u8>> =
-        ICO.iter().map(|&(n, svg)| dibujar(svg, n).encode_png().expect("png")).collect();
+    let imagenes: Vec<Vec<u8>> = ICO
+        .iter()
+        .map(|&(n, svg)| dibujar(svg, n).encode_png().expect("png"))
+        .collect();
 
     let mut out = Vec::new();
     out.extend([0, 0]); // reservado

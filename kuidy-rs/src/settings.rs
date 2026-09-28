@@ -118,7 +118,12 @@ fn view(prefs: Prefs, token: WindowToken) -> Element {
         .gap(px(HUECO_ANCHO))
         .p(px(HUECO_ANCHO))
         .family("Segoe UI, sans-serif")
-        .child(text("Ajustes").text_size(px(20.)).weight(FontWeight::BOLD).color(Color::WHITE))
+        .child(
+            text("Ajustes")
+                .text_size(px(20.))
+                .weight(FontWeight::BOLD)
+                .color(Color::WHITE),
+        )
         .child(grupo(
             "COMO SE VE",
             div()
@@ -129,7 +134,9 @@ fn view(prefs: Prefs, token: WindowToken) -> Element {
                 .child(regulador("Opacidad", prefs.opacity, 0.4..=1.0))
                 .child(regulador("Tamano de letra", prefs.font_scale, 0.8..=1.6))
                 .child(switch_row("Solo subtitulos", prefs.minimal))
-                .child(nota("Sin panel ni cabecera: la letra sola, sobre el escritorio.")),
+                .child(nota(
+                    "Sin panel ni cabecera: la letra sola, sobre el escritorio.",
+                )),
         ))
         .child(grupo(
             "LA LINEA DE ABAJO",
@@ -182,7 +189,12 @@ fn grupo(titulo: &'static str, contenido: Element) -> Element {
         .p(px(HUECO))
         .rounded(px(12.))
         .bg(CARD)
-        .child(text(titulo).text_size(px(11.)).weight(FontWeight::SEMI_BOLD).color(MUTED))
+        .child(
+            text(titulo)
+                .text_size(px(11.))
+                .weight(FontWeight::SEMI_BOLD)
+                .color(MUTED),
+        )
         .child(contenido)
 }
 
@@ -196,7 +208,12 @@ fn atajo(teclas: &'static str, que: &'static str) -> Element {
     div()
         .flex_row()
         .gap(px(HUECO_APRETADO))
-        .child(text(teclas).text_size(px(11.)).weight(FontWeight::SEMI_BOLD).color(MUTED))
+        .child(
+            text(teclas)
+                .text_size(px(11.))
+                .weight(FontWeight::SEMI_BOLD)
+                .color(MUTED),
+        )
         .child(text(que).text_size(px(11.)).color(MUTED))
 }
 
@@ -252,7 +269,9 @@ fn regulador(
 /// tenga: si esta arriba, el area util empieza mas abajo y el panel tambien.
 fn colocar_junto_a_la_bandeja(token: WindowToken) {
     let Some(w) = app::window(token) else { return };
-    let Some(monitor) = w.primary_monitor() else { return };
+    let Some(monitor) = w.primary_monitor() else {
+        return;
+    };
     let area = monitor.work_area;
     let tam = size(px(360.), px(ALTO));
     // Un dedo de margen con el borde, como los flotantes del sistema.

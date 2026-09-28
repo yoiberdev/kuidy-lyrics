@@ -165,7 +165,11 @@ fn to_lyrics(record: &Record) -> Result<Lyrics, Error> {
     Ok(Lyrics {
         lines: plain
             .lines()
-            .map(|l| Line { at: Duration::ZERO, text: l.trim().to_string(), translation: None })
+            .map(|l| Line {
+                at: Duration::ZERO,
+                text: l.trim().to_string(),
+                translation: None,
+            })
             .collect(),
         synced: false,
     })
@@ -214,9 +218,7 @@ fn search(query: &Query) -> Result<Vec<Record>, Error> {
 /// Una peticion a lrclib. `Ok(None)` es un 404, que es una respuesta
 /// legitima — "no la tengo" — y no un fallo del servicio.
 fn request<T: for<'de> Deserialize<'de>>(url: &str) -> Result<Option<T>, Error> {
-    let response = ureq::get(url)
-        .header("User-Agent", &user_agent())
-        .call();
+    let response = ureq::get(url).header("User-Agent", &user_agent()).call();
     match response {
         Ok(mut r) => r
             .body_mut()
@@ -266,7 +268,10 @@ mod tests {
             record(Some("[00:01.00] con tiempos"), None, Some(260.0)),
         ];
         let best = pick_best(candidates, Duration::from_secs(200)).unwrap();
-        assert!(best.has_synced(), "la basura de lrclib casi siempre es texto plano");
+        assert!(
+            best.has_synced(),
+            "la basura de lrclib casi siempre es texto plano"
+        );
     }
 
     #[test]
@@ -294,12 +299,19 @@ mod tests {
         let letra = to_lyrics(&record(None, Some("una\ndos"), None)).unwrap();
         assert!(!letra.synced);
         assert_eq!(letra.lines.len(), 2);
-        assert_eq!(letra.line_at(Duration::from_secs(30)), None, "sin tiempos no se sigue");
+        assert_eq!(
+            letra.line_at(Duration::from_secs(30)),
+            None,
+            "sin tiempos no se sigue"
+        );
     }
 
     #[test]
     fn un_registro_vacio_es_no_encontrada() {
-        assert_eq!(to_lyrics(&record(None, Some("   "), None)), Err(Error::NotFound));
+        assert_eq!(
+            to_lyrics(&record(None, Some("   "), None)),
+            Err(Error::NotFound)
+        );
         assert_eq!(to_lyrics(&record(None, None, None)), Err(Error::NotFound));
     }
 
@@ -339,7 +351,11 @@ mod red {
         };
         match fetch(&query) {
             Ok(letra) => {
-                println!("sincronizada: {}, lineas: {}", letra.synced, letra.lines.len());
+                println!(
+                    "sincronizada: {}, lineas: {}",
+                    letra.synced,
+                    letra.lines.len()
+                );
                 for line in letra.lines.iter().take(4) {
                     println!("  [{:>6}ms] {}", line.at.as_millis(), line.shown());
                 }
