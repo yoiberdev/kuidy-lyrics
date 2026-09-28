@@ -52,6 +52,20 @@ const ADORNOS: &[&str] = &[
     "sub espanol",
     "full album",
     "out now",
+    // Y en espanol, que es la mitad de lo que suena aqui. La regla de "todas
+    // las palabras del grupo" hace seguro incluso meter "en": "(En Vivo)" se
+    // va entero, pero "En Mi Corazon" no, porque "corazon" no es adorno.
+    "oficial",
+    "videoclip",
+    "letra",
+    "letras",
+    "video",
+    "vivo",
+    "en",
+    "directo",
+    "subtitulado",
+    "subtitulada",
+    "completo",
 ];
 
 /// Lo que marca a un invitado. Se quita porque lrclib indexa el tema por su
@@ -74,14 +88,24 @@ pub fn intentos(query: &Query) -> Vec<Query> {
         out.push(Query { track: limpio.clone(), ..query.clone() });
     }
 
-    // Sin artista, lrclib no puede hacer nada con la busqueda exacta. Pero un
-    // titulo de YouTube suele traerlo delante del guion, que es justo lo que
-    // falta.
-    if query.artist.trim().is_empty() {
-        let base = if limpio.is_empty() { query.track.clone() } else { limpio };
-        if let Some((artista, titulo)) = partir(&base) {
-            out.push(Query { track: titulo, artist: artista, ..query.clone() });
-        }
+    // Un canal no es un artista. Lo que Windows entrega de un navegador con
+    // YouTube es el nombre del canal --- "AlejandroSanzVEVO", "Alejandro Sanz
+    // - Topic" --- y con eso lrclib no encuentra nada aunque tenga la cancion.
+    let canal = limpiar_canal(&query.artist);
+    if !canal.is_empty() && canal != query.artist {
+        let track = if limpio.is_empty() { query.track.clone() } else { limpio.clone() };
+        out.push(Query { track, artist: canal, ..query.clone() });
+    }
+
+    // Y el titulo de YouTube suele traer "Artista - Cancion", que es donde
+    // esta el artista de verdad. Se intenta **siempre** que el titulo se pueda
+    // partir, no solo cuando el artista viene vacio: cuando lo que viene es un
+    // canal, el artista no falta, sobra --- y estorba mas que faltar. Esa
+    // condicion de "solo si esta vacio" era la razon de que una cancion
+    // conocidisima no apareciera.
+    let base = if limpio.is_empty() { query.track.clone() } else { limpio };
+    if let Some((artista, titulo)) = partir(&base) {
+        out.push(Query { track: titulo, artist: artista, ..query.clone() });
     }
 
     out.dedup_by(|a, b| a.track == b.track && a.artist == b.artist);
@@ -175,6 +199,20 @@ fn es_adorno(tramo: &str) -> bool {
 ///
 /// Por el primero y no por el ultimo: los titulos con guion suelen tenerlo en
 /// el nombre de la cancion, no en el del artista.
+/// Quita del nombre de un canal lo que no es el artista.
+///
+/// YouTube Music publica cada artista como un canal "Fulano - Topic", y los
+/// canales oficiales de las discograficas anaden "VEVO" pegado al nombre. Ni
+/// uno ni otro existen como artista en ninguna base de letras.
+fn limpiar_canal(artista: &str) -> String {
+    let a = artista.trim();
+    let sin_topic = a.strip_suffix(" - Topic").unwrap_or(a);
+    let sin_vevo = sin_topic.strip_suffix("VEVO").unwrap_or(sin_topic);
+    // "Official" suelto al final, que tambien se ve: "Alejandro Sanz Official".
+    let sin_oficial = sin_vevo.trim().strip_suffix(" Official").unwrap_or(sin_vevo);
+    sin_oficial.trim().to_string()
+}
+
 fn partir(titulo: &str) -> Option<(String, String)> {
     let (artista, resto) = titulo.split_once(" - ")?;
     let artista = artista.trim();
@@ -284,4 +322,46 @@ mod tests {
         let titulo = "Improvisation";
         assert_eq!(limpiar(titulo), titulo);
     }
+
+    /// El caso que hacia que canciones conocidisimas no aparecieran.
+    ///
+    /// Con YouTube en el navegador, Windows entrega como artista el nombre del
+    /// **canal**. La particion "Artista - Cancion" del titulo solo se
+    /// intentaba cuando el artista venia vacio, y con un canal nunca lo esta:
+    /// asi que la unica consulta que podia acertar no se llegaba a hacer.
+    #[test]
+    fn un_canal_de_youtube_no_impide_encontrar_al_artista() {
+        let q = query("Alejandro Sanz - Cancion (Videoclip Oficial)", "AlejandroSanzVEVO");
+        let intentos = intentos(&q);
+        let pares: Vec<(&str, &str)> =
+            intentos.iter().map(|i| (i.track.as_str(), i.artist.as_str())).collect();
+
+        assert!(
+            pares.contains(&("Cancion", "Alejandro Sanz")),
+            "tiene que probar con el artista del titulo: {pares:?}"
+        );
+        // Del canal sale el nombre pegado --- no hay forma de saber donde iba
+        // el espacio --- pero es un intento mas, no el que acierta.
+        assert!(
+            pares.contains(&("Alejandro Sanz - Cancion", "AlejandroSanz")),
+            "y con el canal sin el VEVO: {pares:?}"
+        );
+        assert!(
+            pares.contains(&("Alejandro Sanz - Cancion", "AlejandroSanzVEVO")),
+            "y con el titulo sin el adorno en espanol: {pares:?}"
+        );
+        assert_eq!(pares[0], ("Alejandro Sanz - Cancion (Videoclip Oficial)", "AlejandroSanzVEVO"));
+    }
+
+    /// YouTube Music publica cada artista como un canal "Fulano - Topic".
+    #[test]
+    fn un_canal_topic_se_queda_en_el_artista() {
+        assert_eq!(limpiar_canal("Alejandro Sanz - Topic"), "Alejandro Sanz");
+        assert_eq!(limpiar_canal("AlejandroSanzVEVO"), "AlejandroSanz");
+        assert_eq!(limpiar_canal("Alejandro Sanz Official"), "Alejandro Sanz");
+        // Y un artista normal no se toca, aunque lleve palabras parecidas.
+        assert_eq!(limpiar_canal("Alejandro Sanz"), "Alejandro Sanz");
+        assert_eq!(limpiar_canal("Topic"), "Topic");
+    }
+
 }
